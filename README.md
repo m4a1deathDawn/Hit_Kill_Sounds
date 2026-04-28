@@ -59,7 +59,7 @@ MOD 处理攻击的流程如下：
 
 - 战地系列音效来自 EA/DICE 游戏
 - 使命召唤系列音效来自动视
-- 糖豆人音效来自 Embark Studios
+- 终极角逐音效来自 Embark Studios
 
 ## 致谢
 
