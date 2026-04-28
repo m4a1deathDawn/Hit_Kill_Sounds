@@ -72,6 +72,11 @@ return {
                 default_value = true,
             },
             {
+                setting_id = "hit_melee",
+                type = "checkbox",
+                default_value = true,
+            },
+            {
                 setting_id = "kill_game",
                 type = "dropdown",
                 default_value = "BF1",
@@ -89,6 +94,11 @@ return {
                 type = "dropdown",
                 default_value = "all",
                 options = TARGET_OPTIONS,
+            },
+            {
+                setting_id = "kill_dot",
+                type = "checkbox",
+                default_value = true,
             },
         }
     }

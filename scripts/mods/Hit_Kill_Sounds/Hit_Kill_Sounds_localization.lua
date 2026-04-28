@@ -29,6 +29,10 @@ return {
         en = "Enable DoT Hit Sounds",
         ["zh-cn"] = "启用持续伤害命中音效",
     },
+    hit_melee = {
+        en = "Enable Melee Hit Sounds",
+        ["zh-cn"] = "启用近战命中音效",
+    },
     -- 击杀音效设置
     kill_game = {
         en = "Kill Sound Source Game",
@@ -41,6 +45,10 @@ return {
     kill_target = {
         en = "Kill Sound Target",
         ["zh-cn"] = "击杀音效生效对象",
+    },
+    kill_dot = {
+        en = "Enable DoT Kill Sounds",
+        ["zh-cn"] = "启用持续伤害击杀音效",
     },
     -- 游戏选项本地化
     BF1 = {

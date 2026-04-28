@@ -30,8 +30,6 @@ end
 HKS.on_all_mods_loaded = function()
     if HKS.HitKillSoundsEvents then
         HKS.HitKillSoundsEvents:init_damage_hooks()
-        HKS.HitKillSoundsEvents:init_wwise_hooks()
-        HKS.HitKillSoundsEvents:register_kill_hooks()
     end
     -- 不在这里检查播放器，因为此时播放器可能还没完全启动
 end
