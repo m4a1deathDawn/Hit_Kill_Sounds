@@ -101,6 +101,9 @@ This mod is provided for educational and personal use only. All sound files and 
 
 ## Changelog
 
+### v0.92
+- Thanks to EBuyToDeep for providing the new audio player, significantly reducing antivirus and firewall blocking
+
 ### v0.91
 - Improved kill icon horizontal position calculation logic
 - Added icon horizontal position adjustment (0=left, 50=center, 100=right)
