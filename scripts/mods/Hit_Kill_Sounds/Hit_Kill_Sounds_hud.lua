@@ -78,11 +78,12 @@ HKS.HitKillIconManager.show_icon = function(is_headshot)
         end
     end
 
-    -- 2. 获取屏幕宽度
+    -- 2. 获取屏幕宽度和水平位置设置
     local screen_width = UIWorkspaceSettings.screen.size[1]
+    local horiz_pos = HKS:get("kill_icon_horizontal_position") or 50
 
-    -- 3. 计算图标居中时的左边缘位置
-    local center_x = screen_width / 2 - ICON_ROOT_SIZE / 2
+    -- 3. 计算图标左边缘位置（根据水平位置设置）
+    local center_x = screen_width * (horiz_pos / 100) - ICON_ROOT_SIZE / 2
 
     -- 4. 所有活跃slot的target_x左移一个位置
     for i = 1, MAX_SLOTS do

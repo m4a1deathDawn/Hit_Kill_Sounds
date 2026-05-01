@@ -173,6 +173,13 @@ return {
                         step = 5,
                     },
                     {
+                        setting_id = "kill_icon_horizontal_position",
+                        type = "numeric",
+                        default_value = 50,
+                        range = {0, 100},
+                        step = 5,
+                    },
+                    {
                         setting_id = "kill_icon_size",
                         type = "numeric",
                         default_value = 10,

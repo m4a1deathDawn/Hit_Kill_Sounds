@@ -100,6 +100,10 @@ return {
         en = "Icon Vertical Position",
         ["zh-cn"] = "图标垂直位置",
     },
+    kill_icon_horizontal_position = {
+        en = "Icon Horizontal Position",
+        ["zh-cn"] = "图标水平位置",
+    },
     kill_icon_size = {
         en = "Icon Size",
         ["zh-cn"] = "图标大小",

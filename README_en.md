@@ -13,7 +13,7 @@ A Darktide mod that plays hit and kill sounds from various games when you damage
 - **DoT Support**: Optional hit sounds for damage-over-time effects (bleed, burn, etc.)
 - **Target Filtering**: Filter sounds to only play for specific enemy types (Elite, Special, Boss)
 - **Volume Control**: Adjust volume independently for hit and kill sounds (0-100)
-- **Icon Customization**: Adjust icon size, color, vertical position, and display duration
+- **Icon Customization**: Adjust icon size, color, horizontal/vertical position, and display duration
 - **Multiplayer Support**: Works correctly in both single-player and multiplayer modes
 
 ## Kill Icons
@@ -30,6 +30,7 @@ Major rewrite in v0.9!
   - Icon size (0.5x - 2.0x)
   - Normal icon color (RGB)
   - Headshot icon color (RGB)
+  - Horizontal position (0=left, 50=center, 100=right)
   - Vertical position (0=top, 100=bottom)
   - Display duration (1.0s - 3.0s)
 
@@ -95,6 +96,10 @@ All hit and kill sounds are from their respective games and are used for modding
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v0.91
+- Improved kill icon horizontal position calculation logic
+- Added icon horizontal position adjustment (0=left, 50=center, 100=right)
 
 ### v0.9
 - Kill icon system rewritten with queue-based architecture
