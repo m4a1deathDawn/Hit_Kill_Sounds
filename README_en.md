@@ -75,7 +75,7 @@ The kill icon system preloads textures and manages a queue of 10 slots. New kill
 ## Requirements
 
 - Darktide with mod support enabled
-- HitKillSoundsPlayer (bundled with this mod)
+- HitKillSoundsPlayer (bundled with this mod, optimized to reduce antivirus/firewall false positives)
 
 ## Sound & Asset Sources
 
@@ -96,6 +96,9 @@ All hit and kill sounds are from their respective games and are used for modding
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v0.92
+- Updated HitKillSoundsPlayer audio player, significantly reducing false positives from antivirus and firewall software
 
 ### v0.91
 - Improved kill icon horizontal position calculation logic
