@@ -75,7 +75,7 @@ v0.9 大改版！
 ## 系统要求
 
 - 已启用 MOD 支持的暗潮 (Darktide)
-- HitKillSoundsPlayer（随本 MOD 一起提供，已优化以降低被杀毒软件/防火墙拦截的概率）
+- HitKillSoundsPlayer（随本 MOD 一起提供）
 
 ## 音效来源
 
@@ -91,14 +91,15 @@ v0.9 大改版！
 
 - **B站 UP 主 EBuyToDeep** ([https://space.bilibili.com/1273948298](https://space.bilibili.com/1273948298))：感谢他提供的外部音频播放器方案，使这个 MOD 成为可能。HitKillSoundsPlayer 应用程序的概念来源于他的 EBuyToDeep_KillFeedBack MOD。
 
+## 播放器说明
+
+HitKillSoundsPlayer 是一款外部音频播放器，负责通过 HTTP 请求播放音效。新版播放器大幅降低被杀毒软件和防火墙拦截的概率，开箱即用。
+
 ## 许可证
 
 本 MOD 仅供教育和个人使用。所有音效文件和图标版权归其各自版权持有人所有。
 
 ## 更新日志
-
-### v0.92
-- 更新 HitKillSoundsPlayer 播放器，大幅降低被杀毒软件和防火墙拦截的概率
 
 ### v0.91
 - 完善击杀图标水平位置计算逻辑

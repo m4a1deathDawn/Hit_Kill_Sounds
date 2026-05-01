@@ -75,7 +75,7 @@ The kill icon system preloads textures and manages a queue of 10 slots. New kill
 ## Requirements
 
 - Darktide with mod support enabled
-- HitKillSoundsPlayer (bundled with this mod, optimized to reduce antivirus/firewall false positives)
+- HitKillSoundsPlayer (bundled with this mod)
 
 ## Sound & Asset Sources
 
@@ -91,14 +91,15 @@ All hit and kill sounds are from their respective games and are used for modding
 
 - **BiliBili UP EBuyToDeep** ([https://space.bilibili.com/1273948298](https://space.bilibili.com/1273948298)): For providing the external audio player solution that made this mod possible. The HitKillSoundsPlayer application is based on the concept from their EBuyToDeep_KillFeedBack mod.
 
+## Audio Player
+
+HitKillSoundsPlayer is an external audio player responsible for playing sounds via HTTP requests. The new version significantly reduces the probability of being blocked by antivirus software and firewalls, ready to use out of the box.
+
 ## License
 
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
-
-### v0.92
-- Updated HitKillSoundsPlayer audio player, significantly reducing false positives from antivirus and firewall software
 
 ### v0.91
 - Improved kill icon horizontal position calculation logic
