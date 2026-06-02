@@ -64,4 +64,12 @@ HKS.on_all_mods_loaded = function()
 end
 
 HKS.on_setting_changed = function(setting_id)
+    if setting_id == "enabled" and HKS:get("enabled") == false then
+        if HKS.HitKillSoundsPlayer then
+            HKS.HitKillSoundsPlayer.stop_file(1)
+            HKS.HitKillSoundsPlayer.stop_file(2)
+            HKS.HitKillSoundsPlayer.stop_file(3)
+            HKS.HitKillSoundsPlayer.stop_file(4)
+        end
+    end
 end
