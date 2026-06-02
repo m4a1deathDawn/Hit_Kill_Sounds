@@ -247,6 +247,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
     local headshot_r = HKS:get("kill_icon_headshot_color_r") or 255
     local headshot_g = HKS:get("kill_icon_headshot_color_g") or 0
     local headshot_b = HKS:get("kill_icon_headshot_color_b") or 0
+    local transparency_factor = (HKS:get("kill_icon_transparency") or 100) / 100
 
     -- 更新每个slot
     for i = 1, MAX_SLOTS do
@@ -284,7 +285,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
                 local leave_offset = SLOT_SPACING * progress
                 slot.current_x = slot.target_x - leave_offset
 
-                local alpha = math.floor(255 * (1 - progress))
+                local alpha = math.floor(255 * (1 - progress) * transparency_factor)
                 icon_widget.style.icon.color = {alpha, slot.is_headshot and headshot_r or normal_r, slot.is_headshot and headshot_g or normal_g, slot.is_headshot and headshot_b or normal_b}
                 if icon_widget.style.circle then
                     icon_widget.style.circle.material_values.texture_map = nil
@@ -346,9 +347,9 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
 
             -- 应用颜色
             if is_headshot then
-                icon_widget.style.icon.color = {alpha, headshot_r, headshot_g, headshot_b}
+                icon_widget.style.icon.color = {math.floor(alpha * transparency_factor), headshot_r, headshot_g, headshot_b}
             else
-                icon_widget.style.icon.color = {alpha, normal_r, normal_g, normal_b}
+                icon_widget.style.icon.color = {math.floor(alpha * transparency_factor), normal_r, normal_g, normal_b}
             end
 
             -- 应用scale和offset
@@ -392,7 +393,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
                     math.floor((ICON_ROOT_SIZE - circle_size[2]) * 0.5),
                     0,
                 }
-                circle_widget.style.circle.color = {circle_alpha, headshot_r, headshot_g, headshot_b}
+                circle_widget.style.circle.color = {math.floor(circle_alpha * transparency_factor), headshot_r, headshot_g, headshot_b}
             elseif circle_widget.style and circle_widget.style.circle then
                 circle_widget.style.circle.material_values.texture_map = nil
             end

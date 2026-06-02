@@ -57,9 +57,14 @@ return {
                 },
             },
             {
-                setting_id = "sound_settings",
+                setting_id = "hit_sound_settings",
                 type = "group",
                 sub_widgets = {
+                    {
+                        setting_id = "hit_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
                     {
                         setting_id = "hit_game",
                         type = "dropdown",
@@ -86,6 +91,17 @@ return {
                     },
                     {
                         setting_id = "hit_melee",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                },
+            },
+            {
+                setting_id = "kill_sound_settings",
+                type = "group",
+                sub_widgets = {
+                    {
+                        setting_id = "kill_sound_enabled",
                         type = "checkbox",
                         default_value = true,
                     },
@@ -123,6 +139,13 @@ return {
                         setting_id = "kill_icon_enabled",
                         type = "checkbox",
                         default_value = true,
+                    },
+                    {
+                        setting_id = "kill_icon_transparency",
+                        type = "numeric",
+                        default_value = 100,
+                        range = {0, 100},
+                        step = 5,
                     },
                     {
                         setting_id = "kill_icon_debug",

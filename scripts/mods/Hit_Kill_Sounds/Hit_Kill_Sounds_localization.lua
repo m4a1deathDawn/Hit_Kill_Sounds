@@ -4,13 +4,13 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v0.9{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v0.9{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v0.95{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v0.95{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
     },
     -- 主开关
     enabled = {
-        en = "Enable Hit/Kill Sounds",
-        ["zh-cn"] = "启用命中/击杀音效",
+        en = "Master Switch",
+        ["zh-cn"] = "总开关",
     },
     -- 分组标题
     general_settings = {
@@ -21,11 +21,23 @@ return {
         en = "Sound Settings",
         ["zh-cn"] = "音效设置",
     },
+    hit_sound_settings = {
+        en = "Hit Sound Settings",
+        ["zh-cn"] = "命中音效设置",
+    },
+    kill_sound_settings = {
+        en = "Kill Sound Settings",
+        ["zh-cn"] = "击杀音效设置",
+    },
     icon_settings = {
         en = "Icon Settings",
         ["zh-cn"] = "图标设置",
     },
     -- 命中音效设置
+    hit_sound_enabled = {
+        en = "Enable Hit Sounds",
+        ["zh-cn"] = "启用命中音效",
+    },
     hit_game = {
         en = "Hit Sound Source Game",
         ["zh-cn"] = "命中音效来源游戏",
@@ -47,6 +59,10 @@ return {
         ["zh-cn"] = "启用近战命中音效",
     },
     -- 击杀音效设置
+    kill_sound_enabled = {
+        en = "Enable Kill Sounds",
+        ["zh-cn"] = "启用击杀音效",
+    },
     kill_game = {
         en = "Kill Sound Source Game",
         ["zh-cn"] = "击杀音效来源游戏",
@@ -67,6 +83,10 @@ return {
     kill_icon_enabled = {
         en = "Enable Kill Icon",
         ["zh-cn"] = "启用击杀图标",
+    },
+    kill_icon_transparency = {
+        en = "Kill Icon Transparency",
+        ["zh-cn"] = "击杀图标透明度",
     },
     kill_icon_debug = {
         en = "Debug Mode",

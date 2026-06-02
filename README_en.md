@@ -28,6 +28,7 @@ Major rewrite in v0.9!
 - **Adjustable Parameters**:
   - Icon toggle
   - Icon size (0.5x - 2.0x)
+  - Icon transparency (0% - 100%)
   - Normal icon color (RGB)
   - Headshot icon color (RGB)
   - Horizontal position (0=left, 50=center, 100=right)
@@ -100,6 +101,14 @@ HitKillSoundsPlayer is an external audio player responsible for playing sounds v
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v0.95
+- Fixed bug where the master switch was visible in settings but had no actual effect
+- Split "Sound Settings" into separate "Hit Sound Settings" and "Kill Sound Settings" groups
+- Added independent "Enable Hit Sounds" and "Enable Kill Sounds" sub-toggles
+- Decoupled kill sounds from kill icons: each can be toggled independently
+- Added kill icon transparency slider (0% - 100%)
+- Master switch now immediately stops all currently playing sounds when turned off
 
 ### v0.92
 - Thanks to EBuyToDeep for providing the new audio player, significantly reducing antivirus and firewall blocking

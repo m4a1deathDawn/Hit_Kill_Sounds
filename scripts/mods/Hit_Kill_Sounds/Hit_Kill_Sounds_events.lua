@@ -464,6 +464,11 @@ end
 
 -- 处理攻击结果的内部函数
 local function handle_attack_result(damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike)
+    -- 总开关关闭时静默
+    if not HKS:get("enabled") then
+        return
+    end
+
     -- 只处理有效伤害
     if not damage or damage <= 0 then
         return
@@ -510,13 +515,20 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         end
 
         -- 播放击杀音效
-        play_kill_sound(is_kill_headshot)
+        if HKS:get("kill_sound_enabled") then
+            play_kill_sound(is_kill_headshot)
+        end
 
         -- 显示击杀图标
         if HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
             HKS.HitKillIconManager.show_icon(is_kill_headshot)
         end
 
+        return
+    end
+
+    -- 命中音效子开关关闭时静默
+    if not HKS:get("hit_sound_enabled") then
         return
     end
 
