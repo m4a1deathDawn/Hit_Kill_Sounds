@@ -102,6 +102,11 @@ This mod is provided for educational and personal use only. All sound files and 
 
 ## Changelog
 
+### v0.97
+- Fixed DoT (damage-over-time) misidentification bug: When using the Psyker Chain Lightning staff or other electrocution damage, the mod would still play hit/kill sounds even with the "DoT Hit Sound" and "DoT Kill Sound" toggles disabled. Now correctly identifies all DoT types (bleed, burn, toxin, corruption, grimoire, warpfire, electrocution)
+- Decoupled DoT kill sound and kill icon controls: Previously, disabling the "DoT Kill Sound" toggle also suppressed the kill icon for DoT kills
+- Added new "Show Kill Icon on DoT Kills" toggle (under Kill Icon Settings), allowing independent control of HUD kill icon display for DoT kills. Enabled by default
+
 ### v0.96
 - Added "Enable Game's Hit Sounds" toggle (under Hit Sound Settings)
 - Added "Enable Game's Kill Sounds" toggle (under Kill Sound Settings)

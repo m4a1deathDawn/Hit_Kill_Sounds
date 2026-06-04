@@ -151,6 +151,11 @@ return {
                         default_value = true,
                     },
                     {
+                        setting_id = "kill_dot_icon",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    {
                         setting_id = "kill_icon_transparency",
                         type = "numeric",
                         default_value = 100,

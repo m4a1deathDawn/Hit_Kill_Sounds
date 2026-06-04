@@ -4,6 +4,21 @@ HKS.HitKillSoundsEvents = {}
 
 -- 引入AttackSettings用于攻击结果检测
 local AttackSettings = require("scripts/settings/damage/attack_settings")
+local DamageSettings = require("scripts/settings/damage/damage_settings")
+local damage_types = DamageSettings.damage_types
+
+-- DoT（Damage over Time）damage_type 集合
+-- 基于 D:\暗潮mod\scripts\settings\damage\damage_settings.lua line 5 中
+-- damage_types 枚举的实证分析；任何在此集合中的 damage_type 都被视为持续伤害
+local DOT_DAMAGE_TYPES = {
+    [damage_types.bleeding]      = true,  -- 出血（狂热者血咒等）
+    [damage_types.burning]       = true,  -- 燃烧（火焰喷射器、燃烧弹）
+    [damage_types.toxin]         = true,  -- 中毒（毒药 stat）
+    [damage_types.corruption]    = true,  -- 腐化（永久伤害）
+    [damage_types.grimoire]      = true,  -- 死灵之书 tick
+    [damage_types.warpfire]      = true,  -- 灵能火焰
+    [damage_types.electrocution] = true,  -- 触电（链式闪电法杖等）—— §13 bug 修复重点
+}
 
 -- 声类型枚举（与 EBuyToDeepPlayer.lua:289-297 一致）
 local SOUND_TYPE = table.enum(
@@ -540,13 +555,23 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
     end
 
     -- DoT伤害类型检测
+    -- 优先依据 damage_profile.damage_type 字段（权威，由 damage_profile 显式声明）
+    -- 后备依据 damage_profile.name 关键字模糊匹配（兼容部分未显式设置 damage_type 的 buff 类伤害）
     local is_dot_damage = false
-    if damage_profile and damage_profile.name then
-        local profile_name = damage_profile.name:lower()
-        if profile_name:find("bleed") or profile_name:find("burn") or profile_name:find("fire") or
-           profile_name:find("toxin") or profile_name:find("corruption") or profile_name:find("grimoire") or
-           profile_name:find("electrocution") or profile_name:find("warpfire") then
+    if damage_profile then
+        -- 主判定：damage_type 字段查表
+        local dt = damage_profile.damage_type
+        if dt and DOT_DAMAGE_TYPES[dt] then
             is_dot_damage = true
+        elseif damage_profile.name then
+            -- 后备判定：profile name 关键字模糊匹配
+            local profile_name = damage_profile.name:lower()
+            if profile_name:find("bleed") or profile_name:find("burn") or profile_name:find("fire") or
+               profile_name:find("toxin") or profile_name:find("corruption") or profile_name:find("grimoire") or
+               profile_name:find("electrocution") or profile_name:find("warpfire") or
+               profile_name:find("chain_lighting") or profile_name:find("chain_lightning") then
+                is_dot_damage = true
+            end
         end
     end
 
@@ -556,26 +581,28 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
     -- 如果是击杀
     if attack_result == AttackSettings.attack_results.died then
-        -- 检查DoT击杀音效开关
-        local enable_dot_kill = HKS:get("kill_dot")
-        if is_dot_damage and not enable_dot_kill then
-            return
-        end
-
         local is_kill_headshot = hit_weakspot == true
 
+        -- 击杀 target 过滤（同时影响音效与图标，与原行为一致）
         local kill_target_setting = HKS:get("kill_target") or "all"
         if not is_target_valid(breed_or_nil, kill_target_setting) then
             return
         end
 
+        -- DoT 击杀「音效」与「图标」解耦（§14 修复）：
+        --   kill_dot       → 控制 DoT 击杀【音效】（默认 true=播音）
+        --   kill_dot_icon  → 控制 DoT 击杀【图标】（默认 true=显示）
+        -- 普通（非 DoT）击杀：两个守卫均为 true，照常处理；不引入任何回归。
+        local dot_sound_allowed = not (is_dot_damage and not HKS:get("kill_dot"))
+        local dot_icon_allowed  = not (is_dot_damage and not HKS:get("kill_dot_icon"))
+
         -- 播放击杀音效
-        if HKS:get("kill_sound_enabled") then
+        if dot_sound_allowed and HKS:get("kill_sound_enabled") then
             play_kill_sound(is_kill_headshot)
         end
 
         -- 显示击杀图标
-        if HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
+        if dot_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
             HKS.HitKillIconManager.show_icon(is_kill_headshot)
         end
 
