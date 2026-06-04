@@ -5,6 +5,66 @@ HKS.HitKillSoundsEvents = {}
 -- 引入AttackSettings用于攻击结果检测
 local AttackSettings = require("scripts/settings/damage/attack_settings")
 
+-- 声类型枚举（与 EBuyToDeepPlayer.lua:289-297 一致）
+local SOUND_TYPE = table.enum(
+    "2d_sound",
+    "3d_sound",
+    "start_stop_event",
+    "external_sound",
+    "source_sound",
+    "unit_sound",
+    "unknown_userdata_sound"
+)
+
+-- 声类型映射：第二个参数（position_or_unit_or_id）的 Lua 类型 → SOUND_TYPE
+local sound_type_map = {
+    ["nil"]     = SOUND_TYPE["2d_sound"],
+    ["boolean"] = SOUND_TYPE["start_stop_event"],
+    ["number"]  = SOUND_TYPE["source_sound"],
+    ["Vector3"] = SOUND_TYPE["3d_sound"],
+    ["Unit"]    = SOUND_TYPE["unit_sound"],
+}
+
+-- 命中/击杀 Wwise 事件名 pattern（基于 D:\暗潮mod\scripts 源码 grep 证据，2026-06-04 回填）：
+--   - "melee_hits" 覆盖 wwise/events/weapon/play_melee_hits_* 全部 25+ 事件（近战物理命中音，§11）
+--   - "bullet_hits" 覆盖 wwise/events/weapon/play_bullet_hits_* 全部 60+ 事件（远程/投掷物理命中音，§11）
+--   - "indicator" 覆盖 wwise/events/weapon/play_*indicator* 全部 15 个事件
+--     （暴击 / 爆头 / 死亡刀 / 无伤害命中 / 灵能者死亡 / 强制击杀 反馈音，§12）
+--   - 击杀族：play_*_killed（minion / elite / special / monster / husk / ogryn），D:\暗潮mod\scripts\extension_systems\weapon\actions\action_sweep.lua 实战验证
+-- 子串匹配：event_name:match(pattern) 不受 "wwise/events/..." 前缀影响
+local HIT_WWISE_PATTERNS  = {
+    "melee_hits",     -- 物理近战命中音（§11 已验证）
+    "bullet_hits",    -- 物理远程/投掷命中音（§11 已验证）
+    "indicator",      -- 全部命中质量反馈音（§12 新增，覆盖 15 个 play_*indicator* 事件：
+                     --   暴击 / 爆头 / 死亡刀 / 无伤害命中 / 灵能者死亡 / 强制击杀 等所有 indicator 反馈）
+}
+local KILL_WWISE_PATTERNS = { "play_minion_killed", "play_elite_killed", "play_special_killed", "play_monster_killed", "play_husk_killed", "play_ogryn_killed" }
+
+-- 静音模式表（按 setting 状态填充；event_name:match(pattern) 子串匹配）
+local silenced_patterns = {}
+
+local function rebuild_silenced_patterns()
+    for k in pairs(silenced_patterns) do silenced_patterns[k] = nil end
+
+    local hit_off  = not HKS:get("game_hit_sound_enabled")
+    local kill_off = not HKS:get("game_kill_sound_enabled")
+
+    if hit_off then
+        for _, p in ipairs(HIT_WWISE_PATTERNS) do silenced_patterns[p] = true end
+    end
+    if kill_off then
+        for _, p in ipairs(KILL_WWISE_PATTERNS) do silenced_patterns[p] = true end
+    end
+end
+
+local function is_event_silenced(event_name)
+    if type(event_name) ~= "string" then return false end
+    for pattern in pairs(silenced_patterns) do
+        if event_name:match(pattern) then return true end
+    end
+    return false
+end
+
 -- 内联音效配置
 local HIT_SOUNDS = {
     BF1 = {
@@ -386,14 +446,7 @@ local function is_target_valid(breed_or_nil, target_setting)
     return true
 end
 
--- 音效播放通道
-local TRACKS = {
-    HIT_NORMAL = 1,
-    HIT_HEADSHOT = 2,
-    KILL_NORMAL = 3,
-    KILL_HEADSHOT = 4,
-}
-
+-- 音效播放通道定义在 player.lua, 通过 HKS.HitKillSoundsPlayer.TRACKS 访问
 local function get_random_sound(sounds)
     if not sounds or #sounds == 0 then
         return nil
@@ -402,6 +455,7 @@ local function get_random_sound(sounds)
 end
 
 local function play_hit_sound(is_headshot)
+    local TRACKS = HKS.HitKillSoundsPlayer.TRACKS
     local game = HKS:get("hit_game") or "BF1"
     local volume = HKS:get("hit_volume") or 100
     local sound_type = is_headshot and "headshot" or "normal"
@@ -428,6 +482,7 @@ local function play_hit_sound(is_headshot)
 end
 
 local function play_kill_sound(is_headshot)
+    local TRACKS = HKS.HitKillSoundsPlayer.TRACKS
     local game = HKS:get("kill_game") or "BF1"
     local volume = HKS:get("kill_volume") or 100
     local sound_type = is_headshot and "headshot" or "normal"
@@ -574,6 +629,38 @@ HKS.HitKillSoundsEvents.init_damage_hooks = function()
         func(self, damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike, ...)
         handle_attack_result(damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike)
     end)
+
+    -- 钩住 Wwise 事件触发器，按 setting 静音游戏自带的命中/击杀音效
+    -- 注意：trigger_resource_event 必须按声类型（2d/3d/unit/source/start_stop）传不同数量参数，
+    -- 多传参数会被 Wwise 当作 source_id 解释并触发 "Bad Source Id parameter" 崩溃。
+    -- 实现参考：EBuyToDeepPlayer.lua:425-459
+    HKS:hook(CLASS.WwiseWorld, "trigger_resource_event", function(func, wwise_world, wwise_event_name, position_or_unit_or_id, optional_a, optional_b)
+        if is_event_silenced(wwise_event_name) then
+            return
+        end
+
+        local var_type = type(position_or_unit_or_id)
+        local sound_type = sound_type_map[var_type]
+
+        if sound_type == SOUND_TYPE["2d_sound"] then
+            return func(wwise_world, wwise_event_name)
+        elseif sound_type == SOUND_TYPE["3d_sound"] then
+            return func(wwise_world, wwise_event_name, position_or_unit_or_id)
+        elseif sound_type == SOUND_TYPE["start_stop_event"] then
+            return func(wwise_world, wwise_event_name, position_or_unit_or_id, optional_a, optional_b)
+        elseif sound_type == SOUND_TYPE["source_sound"] then
+            return func(wwise_world, wwise_event_name, position_or_unit_or_id)
+        elseif sound_type == SOUND_TYPE["unit_sound"] then
+            return func(wwise_world, wwise_event_name, position_or_unit_or_id, optional_a)
+        end
+
+        -- 兜底：未识别声类型 → 安全按 2 个参数调用（最少破坏性）
+        return func(wwise_world, wwise_event_name)
+    end)
+
+    rebuild_silenced_patterns()
 end
+
+HKS.HitKillSoundsEvents.rebuild_silenced_patterns = rebuild_silenced_patterns
 
 return HKS.HitKillSoundsEvents

@@ -71,5 +71,9 @@ HKS.on_setting_changed = function(setting_id)
             HKS.HitKillSoundsPlayer.stop_file(3)
             HKS.HitKillSoundsPlayer.stop_file(4)
         end
+    elseif setting_id == "game_hit_sound_enabled" or setting_id == "game_kill_sound_enabled" then
+        if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.rebuild_silenced_patterns then
+            HKS.HitKillSoundsEvents.rebuild_silenced_patterns()
+        end
     end
 end

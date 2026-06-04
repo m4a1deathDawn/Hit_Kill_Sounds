@@ -102,6 +102,14 @@ This mod is provided for educational and personal use only. All sound files and 
 
 ## Changelog
 
+### v0.96
+- Added "Enable Game's Hit Sounds" toggle (under Hit Sound Settings)
+- Added "Enable Game's Kill Sounds" toggle (under Kill Sound Settings)
+- Intercept game's built-in hit/kill sounds via Wwise hook with on-demand muting
+- Fixed game startup crash caused by Wwise hook signature mismatch
+- Fixed game hit sound toggle not silencing crit/headshot sounds
+- Code structure optimization: removed unused settings and redundant constants
+
 ### v0.95
 - Fixed bug where the master switch was visible in settings but had no actual effect
 - Split "Sound Settings" into separate "Hit Sound Settings" and "Kill Sound Settings" groups
