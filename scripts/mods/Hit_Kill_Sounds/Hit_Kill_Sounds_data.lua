@@ -94,6 +94,11 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
+                    {
+                        setting_id = "game_hit_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
                 },
             },
             {
@@ -129,6 +134,11 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
+                    {
+                        setting_id = "game_kill_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
                 },
             },
             {
@@ -146,11 +156,6 @@ return {
                         default_value = 100,
                         range = {0, 100},
                         step = 5,
-                    },
-                    {
-                        setting_id = "kill_icon_debug",
-                        type = "checkbox",
-                        default_value = false,
                     },
                     {
                         setting_id = "kill_icon_normal_color_r",

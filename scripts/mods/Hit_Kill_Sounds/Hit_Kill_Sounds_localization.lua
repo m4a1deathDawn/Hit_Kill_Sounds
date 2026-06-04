@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v0.95{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v0.95{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v0.96{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v0.96{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -16,10 +16,6 @@ return {
     general_settings = {
         en = "General Settings",
         ["zh-cn"] = "通用设置",
-    },
-    sound_settings = {
-        en = "Sound Settings",
-        ["zh-cn"] = "音效设置",
     },
     hit_sound_settings = {
         en = "Hit Sound Settings",
@@ -79,6 +75,14 @@ return {
         en = "Enable DoT Kill Sounds",
         ["zh-cn"] = "启用持续伤害击杀音效",
     },
+    game_hit_sound_enabled = {
+        en = "Enable Game's Hit Sounds",
+        ["zh-cn"] = "启用游戏自带命中音效",
+    },
+    game_kill_sound_enabled = {
+        en = "Enable Game's Kill Sounds",
+        ["zh-cn"] = "启用游戏自带击杀音效",
+    },
     -- 击杀图标设置
     kill_icon_enabled = {
         en = "Enable Kill Icon",
@@ -87,10 +91,6 @@ return {
     kill_icon_transparency = {
         en = "Kill Icon Transparency",
         ["zh-cn"] = "击杀图标透明度",
-    },
-    kill_icon_debug = {
-        en = "Debug Mode",
-        ["zh-cn"] = "调试模式",
     },
     kill_icon_normal_color_r = {
         en = "Normal Icon Color - Red",

@@ -6,7 +6,8 @@ local UIWidget = require("scripts/managers/ui/ui_widget")
 -- 图标尺寸
 local ICON_SIZE = 64
 local ICON_ROOT_SIZE = 96
-local SLOT_SPACING = 110
+-- 击杀图标离场动画专用: 图标向左滑出的最大偏移 (像素), 与 slot 实际间距无关
+local LEAVE_OFFSET = 110
 local MAX_SLOTS = 10
 
 -- 预加载的纹理
@@ -282,7 +283,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
                 -- 离场动画：向左滑出并淡出
                 local progress = leave_elapsed / leave_duration
                 progress = 1 - (1 - progress) ^ 3
-                local leave_offset = SLOT_SPACING * progress
+                local leave_offset = LEAVE_OFFSET * progress
                 slot.current_x = slot.target_x - leave_offset
 
                 local alpha = math.floor(255 * (1 - progress) * transparency_factor)

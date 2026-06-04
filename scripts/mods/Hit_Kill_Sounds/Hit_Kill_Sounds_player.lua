@@ -1,8 +1,6 @@
 local HKS = get_mod("Hit_Kill_Sounds")
 HKS.HitKillSoundsPlayer = {}
 
-HKS.HitKillSoundsPlayer.mods_loaded_functions = {}
-
 local binaries_path_handle = Mods.lua.io.popen("cd")
 local binaries_path = binaries_path_handle:read()
 binaries_path_handle:close()
@@ -49,6 +47,7 @@ local TRACKS = {
     KILL_NORMAL = 3,
     KILL_HEADSHOT = 4,
 }
+HKS.HitKillSoundsPlayer.TRACKS = TRACKS
 
 HKS.HitKillSoundsPlayer.play_file = function(
     path,
@@ -82,12 +81,6 @@ HKS.HitKillSoundsPlayer.stop_file = function(playing_trackid)
                 playing_trackid = playing_trackid
             }
         })
-    end
-end
-
-HKS.HitKillSoundsPlayer.on_all_mods_loaded = function()
-    for _, fun in pairs(HKS.HitKillSoundsPlayer.mods_loaded_functions) do
-        fun()
     end
 end
 
