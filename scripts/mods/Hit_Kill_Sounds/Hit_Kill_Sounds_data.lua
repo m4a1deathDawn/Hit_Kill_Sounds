@@ -39,6 +39,21 @@ for i, opt in ipairs(TARGET_OPTIONS) do
     end
 end
 
+-- 为每个 dropdown 创建独立的 options 深拷贝
+-- 防止 DMF 递归本地化 text 字段导致 <> 累积包裹
+local function make_localized_options(raw_options)
+    local result = {}
+    for i, opt in ipairs(raw_options) do
+        local text = opt.text
+        local localized = HKS:localize(opt.value)
+        if localized and localized ~= opt.value then
+            text = localized
+        end
+        result[i] = { text = text, value = opt.value }
+    end
+    return result
+end
+
 return {
     name = HKS:localize("mod_name"),
     description = HKS:localize("mod_description"),
@@ -66,10 +81,16 @@ return {
                         default_value = true,
                     },
                     {
-                        setting_id = "hit_game",
+                        setting_id = "hit_game_normal",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = GAME_OPTIONS,
+                        options = make_localized_options(GAME_OPTIONS),
+                    },
+                    {
+                        setting_id = "hit_headshot_game",
+                        type = "dropdown",
+                        default_value = "BF1",
+                        options = make_localized_options(GAME_OPTIONS),
                     },
                     {
                         setting_id = "hit_volume",
@@ -82,7 +103,7 @@ return {
                         setting_id = "hit_target",
                         type = "dropdown",
                         default_value = "all",
-                        options = TARGET_OPTIONS,
+                        options = make_localized_options(TARGET_OPTIONS),
                     },
                     {
                         setting_id = "hit_dot",
@@ -93,6 +114,18 @@ return {
                         setting_id = "hit_melee",
                         type = "checkbox",
                         default_value = true,
+                    },
+                    {
+                        setting_id = "hit_melee_normal",
+                        type = "dropdown",
+                        default_value = "BF1",
+                        options = make_localized_options(GAME_OPTIONS),
+                    },
+                    {
+                        setting_id = "hit_melee_headshot",
+                        type = "dropdown",
+                        default_value = "BF1",
+                        options = make_localized_options(GAME_OPTIONS),
                     },
                     {
                         setting_id = "game_hit_sound_enabled",
@@ -111,10 +144,16 @@ return {
                         default_value = true,
                     },
                     {
-                        setting_id = "kill_game",
+                        setting_id = "kill_game_normal",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = GAME_OPTIONS,
+                        options = make_localized_options(GAME_OPTIONS),
+                    },
+                    {
+                        setting_id = "kill_headshot_game",
+                        type = "dropdown",
+                        default_value = "BF1",
+                        options = make_localized_options(GAME_OPTIONS),
                     },
                     {
                         setting_id = "kill_volume",
@@ -127,7 +166,7 @@ return {
                         setting_id = "kill_target",
                         type = "dropdown",
                         default_value = "all",
-                        options = TARGET_OPTIONS,
+                        options = make_localized_options(TARGET_OPTIONS),
                     },
                     {
                         setting_id = "kill_dot",

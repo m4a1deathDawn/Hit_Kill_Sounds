@@ -102,6 +102,13 @@ This mod is provided for educational and personal use only. All sound files and 
 
 ## Changelog
 
+### v1.0
+- Separated normal and headshot hit sounds: Added two new independent dropdowns under Hit Sound Settings — "Normal Hit Sound Source Game" and "Headshot Hit Sound Source Game" — letting you pick a different game source for normal hits vs headshot (weakspot) hits
+- Separated normal and headshot kill sounds: Added two new independent dropdowns under Kill Sound Settings — "Normal Kill Sound Source Game" and "Headshot Kill Sound Source Game"
+- Added independent melee hit sound configuration: Added two new dropdowns under Hit Sound Settings — "Normal Melee Hit Sound Source Game" and "Headshot Melee Hit Sound Source Game" — usable when the "Enable Melee Hit Sounds" toggle is on, letting you assign a different game source for normal melee hits and melee headshot hits
+- Fixed DMF dropdown label bug: Six shared game-source dropdowns and two shared target-type dropdowns were getting wrapped in 1 to 3 pairs of stray `<>` characters under the Chinese locale; resolved by generating a fresh options copy per dropdown
+- Full backward compatibility: All new settings retain the legacy `hit_game` / `kill_game` values as fallback, so existing users keep their current behavior after upgrading
+
 ### v0.97
 - Fixed DoT (damage-over-time) misidentification bug: When using the Psyker Chain Lightning staff or other electrocution damage, the mod would still play hit/kill sounds even with the "DoT Hit Sound" and "DoT Kill Sound" toggles disabled. Now correctly identifies all DoT types (bleed, burn, toxin, corruption, grimoire, warpfire, electrocution)
 - Decoupled DoT kill sound and kill icon controls: Previously, disabling the "DoT Kill Sound" toggle also suppressed the kill icon for DoT kills

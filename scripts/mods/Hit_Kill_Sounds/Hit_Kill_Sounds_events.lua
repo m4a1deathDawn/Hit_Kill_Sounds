@@ -469,9 +469,28 @@ local function get_random_sound(sounds)
     return sounds[math.random(#sounds)]
 end
 
-local function play_hit_sound(is_headshot)
+local function play_hit_sound(is_headshot, is_melee)
     local TRACKS = HKS.HitKillSoundsPlayer.TRACKS
-    local game = HKS:get("hit_game") or "BF1"
+    local game
+    if is_melee then
+        if is_headshot then
+            game = HKS:get("hit_melee_headshot")
+                  or HKS:get("hit_headshot_game")
+                  or HKS:get("hit_game")
+                  or "BF1"
+        else
+            game = HKS:get("hit_melee_normal")
+                  or HKS:get("hit_game_normal")
+                  or HKS:get("hit_game")
+                  or "BF1"
+        end
+    else
+        if is_headshot then
+            game = HKS:get("hit_headshot_game") or HKS:get("hit_game") or "BF1"
+        else
+            game = HKS:get("hit_game_normal") or HKS:get("hit_game") or "BF1"
+        end
+    end
     local volume = HKS:get("hit_volume") or 100
     local sound_type = is_headshot and "headshot" or "normal"
     local sounds = HIT_SOUNDS[game]
@@ -498,7 +517,12 @@ end
 
 local function play_kill_sound(is_headshot)
     local TRACKS = HKS.HitKillSoundsPlayer.TRACKS
-    local game = HKS:get("kill_game") or "BF1"
+    local game
+    if is_headshot then
+        game = HKS:get("kill_headshot_game") or HKS:get("kill_game") or "BF1"
+    else
+        game = HKS:get("kill_game_normal") or HKS:get("kill_game") or "BF1"
+    end
     local volume = HKS:get("kill_volume") or 100
     local sound_type = is_headshot and "headshot" or "normal"
     local sounds = KILL_SOUNDS[game]
@@ -646,7 +670,8 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
     local is_weakspot = hit_weakspot == true
 
     if can_play_hit() then
-        play_hit_sound(is_weakspot)
+        local is_melee = attack_type == "melee"
+        play_hit_sound(is_weakspot, is_melee)
     end
 end
 
