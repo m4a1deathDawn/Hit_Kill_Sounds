@@ -52,6 +52,12 @@ Icon assets: Battlefield V kill icons
 | Call of Duty: MW 3 | 1 | 1 | 1 | 1 |
 | The Finals | 3 variants | 5 variants | 1 | 1 |
 | Overwatch | 1 | 1 | 2 variants | 1 |
+| Call of Duty: Warzone | 2 variants | → normal | 1 | → normal |
+| Call of Duty: Warzone 2 | 1 | → normal | 2 variants | → normal |
+| Delta Force | 1 | → normal | 1 | 1 |
+| Apex Legends | 8 variants | → normal | 1 | → normal |
+
+*`→ normal` indicates the game source has no dedicated headshot files; the mod falls back to that source's normal pool so every headshot still produces feedback.*
 
 ## How It Works
 
@@ -101,6 +107,14 @@ HitKillSoundsPlayer is an external audio player responsible for playing sounds v
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.05
+- Added 4 new sound sources: Call of Duty: Warzone, Call of Duty: Warzone 2, Delta Force, and Apex Legends (12 hit files + 6 kill files distributed across 8 new audio subdirectories under `audio/HitSounds/` and `audio/KillSounds/`)
+- Companion (Adamant dog) sound decoupling: Added 3 new independent toggles — "Enable Companion Hit Sound", "Enable Companion Kill Sound", "Enable Companion Kill Icon" (under General Settings) — letting you independently mute sounds and icons caused by Adamant dog attacks. Default ON preserves existing behavior for legacy users.
+- v1.12.0 / v1.12.1 compatibility patch: Added 6 new Wwise patterns (`play_chord_claw_hit`, `play_transonic_blades_impact_hit`, `play_power_sword_1h_p3_hit`, `play_power_sword_hit`, `play_arc_maul_hit`, `play_powermaul_1h_hit`) so the original hit sounds of Cryptic Chord Claw / Transonic Blades, Power Sword P3, and Power Maul P3 are silenced when "Enable Game's Hit Sounds" is off.
+- Headshot fallback: When a selected source has no dedicated headshot files (e.g. Warzone, APEX), the mod falls back to that source's normal pool so headshots still produce feedback instead of going silent.
+- APEX shield sounds routed to normal: Per design decision, APEX's 8 shield-hit files and 1 shield-break file are pooled into the normal category (substituting for flesh-tone hits).
+- CODWZ2 armor kill categorized as normal: `k_codwz2_armor.wav` joins the normal-kill pool as a second variant (deliberately *not* classified as headshot, since "armor" denotes a kill against armored enemies).
 
 ### v1.0
 - Separated normal and headshot hit sounds: Added two new independent dropdowns under Hit Sound Settings — "Normal Hit Sound Source Game" and "Headshot Hit Sound Source Game" — letting you pick a different game source for normal hits vs headshot (weakspot) hits
