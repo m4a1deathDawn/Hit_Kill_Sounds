@@ -20,6 +20,11 @@ local DOT_DAMAGE_TYPES = {
     [damage_types.electrocution] = true,  -- 触电（链式闪电法杖等）—— §13 bug 修复重点
 }
 
+-- §11.B 同伴 attack_type 白名单（仅 Adamant 狗，详见 §11.B.7）
+local COMPANION_ATTACK_TYPES = {
+    [AttackSettings.attack_types.companion_dog] = true,
+}
+
 -- 声类型枚举（与 EBuyToDeepPlayer.lua:289-297 一致）
 local SOUND_TYPE = table.enum(
     "2d_sound",
@@ -52,6 +57,13 @@ local HIT_WWISE_PATTERNS  = {
     "bullet_hits",    -- 物理远程/投掷命中音（§11 已验证）
     "indicator",      -- 全部命中质量反馈音（§12 新增，覆盖 15 个 play_*indicator* 事件：
                      --   暴击 / 爆头 / 死亡刀 / 无伤害命中 / 灵能者死亡 / 强制击杀 等所有 indicator 反馈）
+    -- §11.A v1.12.1 兼容性补漏（2026-07-01）
+    "play_chord_claw_hit",               -- Cryptic 共振爪（含 _flesh / _rip_flesh）
+    "play_transonic_blades_impact_hit",  -- Cryptic 共振刃/刀
+    "play_power_sword_1h_p3_hit",        -- Power Sword P3 重做（含 _heavy / _light）
+    "play_power_sword_hit",              -- Power Sword 通用
+    "play_arc_maul_hit",                 -- Power Maul P3 arc active
+    "play_powermaul_1h_hit",             -- Power Maul P3
 }
 local KILL_WWISE_PATTERNS = { "play_minion_killed", "play_elite_killed", "play_special_killed", "play_monster_killed", "play_husk_killed", "play_ogryn_killed" }
 
@@ -289,6 +301,41 @@ local HIT_SOUNDS = {
             "HitSounds/Overwatch/hitsound_ow_headshot.wav",
         },
     },
+    -- §12 新增 4 个命中音源（2026-07-01）
+    -- 注：APEX shieldhit 全部归 normal（用户决策，详见 MOD_PLAN §12.3.1）
+    -- 注：缺 headshot 文件的游戏依赖现有 line 503-509 的 fallback 自动顶上 normal（§12.3.4 已实现）
+    CODWZ = {
+        normal = {
+            "HitSounds/CODWZ/hitsound_codwz_v1.wav",
+            "HitSounds/CODWZ/hitsound_codwz_v2.wav",
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
+    CODWZ2 = {
+        normal = {
+            "HitSounds/CODWZ2/hitsound_codwz2_normal.wav",
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
+    DeltaForce = {
+        normal = {
+            "HitSounds/DeltaForce/h_deltaforce.wav",
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
+    APEX = {
+        normal = {
+            "HitSounds/APEX/h_apex_shieldhit_01.wav",
+            "HitSounds/APEX/h_apex_shieldhit_02.wav",
+            "HitSounds/APEX/h_apex_shieldhit_03.wav",
+            "HitSounds/APEX/h_apex_shieldhit_addon.wav",
+            "HitSounds/APEX/h_apex_shieldhit_v2_01.wav",
+            "HitSounds/APEX/h_apex_shieldhit_v2_02.wav",
+            "HitSounds/APEX/h_apex_shieldhit_v2_03.wav",
+            "HitSounds/APEX/h_apex_shieldhit_v2_04.wav",
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
 }
 
 local KILL_SOUNDS = {
@@ -428,6 +475,36 @@ local KILL_SOUNDS = {
             "KillSounds/Overwatch/killsound_ow_normal.wav",
         },
     },
+    -- §12 新增 4 个击杀音源（2026-07-01）
+    -- 注：CODWZ2 armor 归 normal 作为第 2 变体（用户决策，详见 §12.3.3）
+    -- 注：缺 headshot 文件的游戏依赖现有 line 535-541 的 fallback 自动顶上 normal（§12.3.4 已实现）
+    CODWZ = {
+        normal = {
+            "KillSounds/CODWZ/killsound_codwz_normal.wav",
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
+    CODWZ2 = {
+        normal = {
+            "KillSounds/CODWZ2/killsound_codwz2_normal.wav",
+            "KillSounds/CODWZ2/k_codwz2_armor.wav",  -- armor 归 normal（§12.3.3）
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
+    DeltaForce = {
+        normal = {
+            "KillSounds/DeltaForce/k_deltaforce_normal.wav",
+        },
+        headshot = {
+            "KillSounds/DeltaForce/k_deltaforce_headshot.wav",
+        },
+    },
+    APEX = {
+        normal = {
+            "KillSounds/APEX/k_apex_shieldbreak.wav",
+        },
+        headshot = {},  -- 缺 headshot，fallback 到 normal
+    },
 }
 
 -- 命中间隔控制（秒）
@@ -563,6 +640,9 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         return
     end
 
+    -- §11.B 同伴攻击判定（用户 2026-07-01 决策：仅识别 Adamant 狗）
+    local is_companion_attack = attack_type and COMPANION_ATTACK_TYPES[attack_type] == true
+
     -- 只处理有效伤害
     if not damage or damage <= 0 then
         return
@@ -620,13 +700,17 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         local dot_sound_allowed = not (is_dot_damage and not HKS:get("kill_dot"))
         local dot_icon_allowed  = not (is_dot_damage and not HKS:get("kill_dot_icon"))
 
+        -- §11.B 同伴击杀分流（默认 ON 保持老用户行为兼容）
+        local companion_kill_sound_allowed = not (is_companion_attack and not HKS:get("companion_kill_sound_enabled"))
+        local companion_kill_icon_allowed  = not (is_companion_attack and not HKS:get("companion_kill_icon_enabled"))
+
         -- 播放击杀音效
-        if dot_sound_allowed and HKS:get("kill_sound_enabled") then
+        if dot_sound_allowed and companion_kill_sound_allowed and HKS:get("kill_sound_enabled") then
             play_kill_sound(is_kill_headshot)
         end
 
         -- 显示击杀图标
-        if dot_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
+        if dot_icon_allowed and companion_kill_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
             HKS.HitKillIconManager.show_icon(is_kill_headshot)
         end
 
@@ -635,6 +719,12 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
     -- 命中音效子开关关闭时静默
     if not HKS:get("hit_sound_enabled") then
+        return
+    end
+
+    -- §11.B 同伴命中分流（默认 ON 保持老用户行为兼容）
+    local enable_companion_hit = HKS:get("companion_hit_sound_enabled")
+    if is_companion_attack and not enable_companion_hit then
         return
     end
 

@@ -13,6 +13,10 @@ local GAME_OPTIONS = {
     {text = "Call of Duty: MW 3", value = "CODMW3"},
     {text = "The Finals", value = "TheFinals"},
     {text = "Overwatch", value = "Overwatch"},
+    {text = "Call of Duty: Warzone",     value = "CODWZ"},
+    {text = "Call of Duty: Warzone 2",   value = "CODWZ2"},
+    {text = "Delta Force",               value = "DeltaForce"},
+    {text = "Apex Legends",              value = "APEX"},
 }
 
 -- 目标类型选项（使用本地化文本）
@@ -66,6 +70,22 @@ return {
                 sub_widgets = {
                     {
                         setting_id = "enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    -- §11.B 同伴开关（2026-07-01，默认 ON，兼容老用户）
+                    {
+                        setting_id = "companion_hit_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    {
+                        setting_id = "companion_kill_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    {
+                        setting_id = "companion_kill_icon_enabled",
                         type = "checkbox",
                         default_value = true,
                     },

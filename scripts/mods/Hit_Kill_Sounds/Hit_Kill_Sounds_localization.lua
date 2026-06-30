@@ -4,13 +4,26 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.0{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.0{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.05{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.05{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
     },
     -- 主开关
     enabled = {
         en = "Master Switch",
         ["zh-cn"] = "总开关",
+    },
+    -- §11.B 同伴开关（2026-07-01）
+    companion_hit_sound_enabled = {
+        en = "Enable Companion Hit Sound",
+        ["zh-cn"] = "启用同伴命中音效",
+    },
+    companion_kill_sound_enabled = {
+        en = "Enable Companion Kill Sound",
+        ["zh-cn"] = "启用同伴击杀音效",
+    },
+    companion_kill_icon_enabled = {
+        en = "Enable Companion Kill Icon",
+        ["zh-cn"] = "启用同伴击杀图标",
     },
     -- 分组标题
     general_settings = {
@@ -204,6 +217,23 @@ return {
     Overwatch = {
         en = "Overwatch",
         ["zh-cn"] = "守望先锋",
+    },
+    -- §12 新增 4 个游戏（2026-07-01）
+    CODWZ = {
+        en = "Call of Duty: Warzone",
+        ["zh-cn"] = "使命召唤：战区",
+    },
+    CODWZ2 = {
+        en = "Call of Duty: Warzone 2",
+        ["zh-cn"] = "使命召唤：战区 2",
+    },
+    DeltaForce = {
+        en = "Delta Force",
+        ["zh-cn"] = "三角洲行动",
+    },
+    APEX = {
+        en = "Apex Legends",
+        ["zh-cn"] = "APEX 英雄",
     },
     -- 目标类型选项本地化
     all = {
