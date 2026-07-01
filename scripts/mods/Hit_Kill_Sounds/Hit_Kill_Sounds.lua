@@ -10,6 +10,11 @@ local hud_elements = {
         filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_hud",
         class_name = "HudHitKillICON",
     },
+    -- §13.D.2 CF HUD（2026-07-01）
+    {
+        filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_cf_hud",
+        class_name = "HudHitKillCF",
+    },
 }
 
 -- 注册HUD路径

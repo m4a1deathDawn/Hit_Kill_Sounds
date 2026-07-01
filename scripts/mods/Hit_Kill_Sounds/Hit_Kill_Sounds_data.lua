@@ -58,6 +58,12 @@ local function make_localized_options(raw_options)
     return result
 end
 
+-- §13.E.1 风格切换选项（BF5 / CF）
+local STYLE_OPTIONS = {
+    {text = HKS:localize("BF5"), value = "BF5"},
+    {text = HKS:localize("CF"),  value = "CF"},
+}
+
 return {
     name = HKS:localize("mod_name"),
     description = HKS:localize("mod_description"),
@@ -73,21 +79,14 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
-                    -- §11.B 同伴开关（2026-07-01，默认 ON，兼容老用户）
+                    -- §13 CF 连杀计数器重置时间（2026-07-01 从 icon_settings_cf.kill_icon_duration_CF 重命名并迁移）
+                    -- 该值同时控制 CF 计数器重置窗口和 CF 图标显示时长（共享同一窗口，2.0s 默认）
                     {
-                        setting_id = "companion_hit_sound_enabled",
-                        type = "checkbox",
-                        default_value = true,
-                    },
-                    {
-                        setting_id = "companion_kill_sound_enabled",
-                        type = "checkbox",
-                        default_value = true,
-                    },
-                    {
-                        setting_id = "companion_kill_icon_enabled",
-                        type = "checkbox",
-                        default_value = true,
+                        setting_id = "cf_killstreak_reset_time",
+                        type = "numeric",
+                        default_value = 20,
+                        range = {10, 30},
+                        step = 1,
                     },
                 },
             },
@@ -152,6 +151,12 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
+                    -- §11.B 同伴命中音效（2026-07-01 迁移：从 general_settings）
+                    {
+                        setting_id = "companion_hit_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
                 },
             },
             {
@@ -162,6 +167,14 @@ return {
                         setting_id = "kill_sound_enabled",
                         type = "checkbox",
                         default_value = true,
+                    },
+                    -- §13 CF 击杀音效独立开关（2026-07-01 解耦）
+                    -- 启用后使用 killsound_cf_01..09 顺序播放（连杀索引），替代 BF5 随机音效
+                    -- 独立于 kill_icon_style：可单独开 CF 音 + BF5 图，或 BF5 音 + CF 图
+                    {
+                        setting_id = "cf_kill_sound_enabled",
+                        type = "checkbox",
+                        default_value = false,
                     },
                     {
                         setting_id = "kill_game_normal",
@@ -198,96 +211,173 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
+                    -- §11.B 同伴击杀音效（2026-07-01 迁移：从 general_settings）
+                    {
+                        setting_id = "companion_kill_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
                 },
             },
             {
                 setting_id = "icon_settings",
                 type = "group",
                 sub_widgets = {
+                    -- 顶部：风格选择 + 统一开关（不再分 BF5/CF 两个开关）
+                    {
+                        setting_id = "kill_icon_style",
+                        type = "dropdown",
+                        default_value = "BF5",
+                        options = make_localized_options(STYLE_OPTIONS),
+                    },
                     {
                         setting_id = "kill_icon_enabled",
                         type = "checkbox",
                         default_value = true,
                     },
+                    -- §11.B DoT 击杀图标（2026-07-01 从 icon_settings_bf5 提升到顶层，对 BF5/CF 都生效）
                     {
                         setting_id = "kill_dot_icon",
                         type = "checkbox",
                         default_value = true,
                     },
+                    -- §11.B 同伴击杀图标（2026-07-01 迁移：从 general_settings）
                     {
-                        setting_id = "kill_icon_transparency",
-                        type = "numeric",
-                        default_value = 100,
-                        range = {0, 100},
-                        step = 5,
+                        setting_id = "companion_kill_icon_enabled",
+                        type = "checkbox",
+                        default_value = true,
                     },
+                    -- 击杀图标生效对象（2026-07-01 解耦：从 kill_sound_settings.kill_target 独立）
+                    -- 控制所有图标风格（BF5/CF 及后续新增）的生效对象，独立于 kill_target（音效生效对象）
                     {
-                        setting_id = "kill_icon_normal_color_r",
-                        type = "numeric",
-                        default_value = 255,
-                        range = {0, 255},
-                    },
-                    {
-                        setting_id = "kill_icon_normal_color_g",
-                        type = "numeric",
-                        default_value = 255,
-                        range = {0, 255},
-                    },
-                    {
-                        setting_id = "kill_icon_normal_color_b",
-                        type = "numeric",
-                        default_value = 255,
-                        range = {0, 255},
-                    },
-                    {
-                        setting_id = "kill_icon_headshot_color_r",
-                        type = "numeric",
-                        default_value = 255,
-                        range = {0, 255},
-                    },
-                    {
-                        setting_id = "kill_icon_headshot_color_g",
-                        type = "numeric",
-                        default_value = 0,
-                        range = {0, 255},
-                    },
-                    {
-                        setting_id = "kill_icon_headshot_color_b",
-                        type = "numeric",
-                        default_value = 0,
-                        range = {0, 255},
-                    },
-                    {
-                        setting_id = "kill_icon_vertical_position",
-                        type = "numeric",
-                        default_value = 0,
-                        range = {0, 100},
-                        step = 5,
-                    },
-                    {
-                        setting_id = "kill_icon_horizontal_position",
-                        type = "numeric",
-                        default_value = 50,
-                        range = {0, 100},
-                        step = 5,
-                    },
-                    {
-                        setting_id = "kill_icon_size",
-                        type = "numeric",
-                        default_value = 10,
-                        range = {5, 20},
-                        step = 1,
-                    },
-                    {
-                        setting_id = "kill_icon_duration",
+                        setting_id = "kill_icon_target",
                         type = "dropdown",
-                        default_value = "20",
-                        options = {
-                            {text = "1.0s", value = "10"},
-                            {text = "1.5s", value = "15"},
-                            {text = "2.0s", value = "20"},
-                            {text = "2.5s", value = "25"},
-                            {text = "3.0s", value = "30"},
+                        default_value = "all",
+                        options = make_localized_options(TARGET_OPTIONS),
+                    },
+                    -- BF5 风格子分组（12 个设置，kill_dot_icon 已上移）
+                    {
+                        setting_id = "icon_settings_bf5",
+                        type = "group",
+                        sub_widgets = {
+                            {
+                                setting_id = "kill_icon_transparency",
+                                type = "numeric",
+                                default_value = 100,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_normal_color_r",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_normal_color_g",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_normal_color_b",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_headshot_color_r",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_headshot_color_g",
+                                type = "numeric",
+                                default_value = 0,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_headshot_color_b",
+                                type = "numeric",
+                                default_value = 0,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_vertical_position",
+                                type = "numeric",
+                                default_value = 0,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_horizontal_position",
+                                type = "numeric",
+                                default_value = 50,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_size",
+                                type = "numeric",
+                                default_value = 10,
+                                range = {5, 20},
+                                step = 1,
+                            },
+                            {
+                                setting_id = "kill_icon_duration",
+                                type = "dropdown",
+                                default_value = "20",
+                                options = {
+                                    {text = "1.0s", value = "10"},
+                                    {text = "1.5s", value = "15"},
+                                    {text = "2.0s", value = "20"},
+                                    {text = "2.5s", value = "25"},
+                                    {text = "3.0s", value = "30"},
+                                },
+                            },
+                        },
+                    },
+                    -- CF 风格子分组（5 个设置；kill_icon_duration_CF 已迁移并重命名为 general_settings.cf_killstreak_reset_time）
+                    {
+                        setting_id = "icon_settings_cf",
+                        type = "group",
+                        sub_widgets = {
+                            {
+                                setting_id = "cf_killstreak_max",
+                                type = "numeric",
+                                default_value = 13,
+                                range = {10, 30},
+                                step = 1,
+                            },
+                            {
+                                setting_id = "kill_icon_transparency_CF",
+                                type = "numeric",
+                                default_value = 100,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_size_CF",
+                                type = "numeric",
+                                default_value = 10,
+                                range = {5, 20},
+                                step = 1,
+                            },
+                            {
+                                setting_id = "kill_icon_vertical_position_CF",
+                                type = "numeric",
+                                default_value = 0,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_horizontal_position_CF",
+                                type = "numeric",
+                                default_value = 50,
+                                range = {0, 100},
+                                step = 5,
+                            },
                         },
                     },
                 },

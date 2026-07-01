@@ -227,6 +227,9 @@ HudHitKillICON.init = function(self, parent, draw_layer, start_scale)
 end
 
 HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, input_service)
+    -- §13.D.3 BF5 风格守卫（仅在 BF5 模式渲染）
+    if HKS:get("kill_icon_style") ~= "BF5" then return end
+
     local manager = HKS.HitKillIconManager
     local now_time = Managers.time:time("main")
 
@@ -405,6 +408,8 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
 end
 
 HudHitKillICON.draw = function(self, dt, t, ui_renderer, render_settings, input_service)
+    -- §13.D.3 BF5 风格守卫
+    if HKS:get("kill_icon_style") ~= "BF5" then return end
     if not HKS:get("kill_icon_enabled") then
         return
     end

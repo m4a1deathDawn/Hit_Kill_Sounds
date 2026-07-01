@@ -15,6 +15,9 @@ A Darktide mod that plays hit and kill sounds from various games when you damage
 - **Volume Control**: Adjust volume independently for hit and kill sounds (0-100)
 - **Icon Customization**: Adjust icon size, color, horizontal/vertical position, and display duration
 - **Multiplayer Support**: Works correctly in both single-player and multiplayer modes
+- **CF Killstreak System** (v1.1): CrossFire-themed killstreak sound + icon system, plays sounds in indexed order based on killstreak count, switchable style
+- **Style Switch** (v1.1): Toggle between "Battlefield 5 queue-based icon" and "CrossFire killstreak-style icon"
+- **Decoupled CF Sound & Icon** (v1.1): CrossFire killstreak sound is independently toggleable from icon style, supporting 4 combinations (CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5)
 
 ## Kill Icons
 
@@ -36,6 +39,22 @@ Major rewrite in v0.9!
   - Display duration (1.0s - 3.0s)
 
 Icon assets: Battlefield V kill icons
+
+## CF (CrossFire) Killstreak System
+
+New in v1.1! A CrossFire-themed killstreak system ported from the EBuyToDeep_KillFeedBack mod, complementing the default "Battlefield 5 queue-based icon" system.
+
+- **Indexed killstreak sounds**: Plays `killsound_cf_01..09.wav` in order (1→2→…→9→wraps), unlike the random-play behavior of normal kill sounds
+- **Indexed killstreak icons**: Cycles through `kill1..6.png` + a dedicated gold `headshot_gold.png` for first-kill headshots
+- **Dedicated boss sound**: Killing monster-tagged enemies plays `killsound_cf_boss.wav`
+- **Style switch**: Select "CrossFire Style" in the Style dropdown at the top of Kill Icon Settings
+- **Adjustable parameters**:
+  - Killstreak max count (10-30, default 13; wraps to 0 and restarts a new streak when reached)
+  - Icon transparency, size, vertical/horizontal position
+  - Counter reset time (1.0s-3.0s, default 2.0s; controls both the killstreak reset window and the icon display duration)
+- **Decoupled sound & icon**: The "Enable CF Kill Sound" toggle in Kill Sound Settings is independent of icon style — supports 4 combinations: CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5
+
+Icon assets: CrossFire killstreak icons
 
 ## Supported Sound Sources
 
@@ -107,6 +126,20 @@ HitKillSoundsPlayer is an external audio player responsible for playing sounds v
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.1
+- **New CF (CrossFire) killstreak system**: Ported from the EBuyToDeep_KillFeedBack mod. Added 10 kill sound files (`killsound_cf_01..09.wav` + `killsound_cf_boss.wav` under `audio/KillSounds/cf/`) and 7 kill icons (`kill1..6.png` + `headshot_gold.png` under `cartoon_preview/kill_icon/cf/`). Unlike the random-play behavior of normal kill sounds, CF sounds play in killstreak order (killsound_cf_01→02→…→09→wrap to 01)
+- **New style switch dropdown**: Added a "Style" dropdown at the top of Kill Icon Settings, letting you toggle between "Battlefield 5 Style" and "CrossFire Style". Selecting CrossFire activates the new killstreak icon + sound system
+- **New CF independent settings group**: Added a "CrossFire Icon Settings" subgroup under Kill Icon Settings with 6 CF-specific settings (killstreak max, transparency, size, vertical position, horizontal position)
+- **Decoupled CF sound and icon**: Added an "Enable CF Kill Sound (Indexed Killstreak)" toggle in Kill Sound Settings, independent of icon style. You can now mix and match: CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, or BF5+BF5
+- **User-configurable killstreak max**: New "CF Killstreak Max" setting, range 10-30, step 1, default 13. When the counter reaches the max, it wraps around to 0 and starts a new killstreak
+- **Unified kill icon master switch**: Removed the previous BF5/CF independent icon toggles, replaced with a single "Enable Kill Icon" master toggle at the top. Battlefield 5 and CrossFire icons share this switch
+- **CF counter reset time moved to General Settings**: Renamed "CF Icon Display Duration" to "CF Killstreak Reset Time" and moved it to General Settings, range 1.0s-3.0s (×0.1s units). This value now controls both the CF counter reset window and the CF icon display duration
+- **DoT icon toggle moved to Kill Icon Settings top level**: Lifted "Show Kill Icon on DoT Kills" from the BF5 subgroup to the top of Kill Icon Settings, applying to both Battlefield 5 and CrossFire style DoT kill icons
+- **Companion toggles grouped with related features**: Moved the 3 companion (Adamant dog) toggles from General Settings to their respective feature groups — "Enable Companion Hit Sound" to Hit Sound Settings, "Enable Companion Kill Sound" to Kill Sound Settings, "Enable Companion Kill Icon" to Kill Icon Settings
+- **Fixed CF guard separation bug**: Previously, the CF path was gated entirely by hit-sound guards (`kill_dot` / `companion_kill_sound_enabled`), causing CF icons to still appear when "Show Kill Icon on DoT Kills" was off or "Enable Companion Kill Icon" was off. CF sound now uses sound guards and CF icon uses icon guards, so each behavior is controlled by its corresponding toggle
+- **Resource auto-discovery with hardcoded fallback**: Mod load scans CF asset directories to dynamically detect available sound count (0-9) and icon count (0-6). When the scan fails due to DMF mod-sandbox cwd restrictions, the mod falls back to hardcoded defaults (9 sounds, 6 icons) to ensure the feature always works
+- **Decoupled kill target filter**: Added a new "Kill Icon Target" dropdown (kill_icon_target) under Kill Icon Settings, independent of "Kill Sound Target" (kill_target) under Kill Sound Settings. `kill_icon_target` applies to all icon styles — Battlefield 5, CrossFire, and any future additions. 4 combinations supported: ① both "All Enemies" (default — sound + icon both trigger; preserves legacy behavior); ② sound "All" + icon "Elite Only" (minions play sound but show no icon); ③ sound "Elite Only" + icon "All" (minions show icon but play no sound); ④ both "Elite Only"
 
 ### v1.05
 - Added 4 new sound sources: Call of Duty: Warzone, Call of Duty: Warzone 2, Delta Force, and Apex Legends (12 hit files + 6 kill files distributed across 8 new audio subdirectories under `audio/HitSounds/` and `audio/KillSounds/`)
