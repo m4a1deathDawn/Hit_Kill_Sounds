@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.05{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.05{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.1{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.1{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -108,6 +108,11 @@ return {
         en = "Kill Sound Target",
         ["zh-cn"] = "击杀音效生效对象",
     },
+    -- 击杀图标生效对象（2026-07-01 解耦：从 kill_target 独立，控制 BF5/CF 及后续图标风格）
+    kill_icon_target = {
+        en = "Kill Icon Target",
+        ["zh-cn"] = "击杀图标生效对象",
+    },
     kill_dot = {
         en = "Enable DoT Kill Sounds",
         ["zh-cn"] = "启用持续伤害击杀音效",
@@ -172,6 +177,59 @@ return {
     kill_icon_duration = {
         en = "Icon Display Duration",
         ["zh-cn"] = "图标显示时长",
+    },
+    -- §13.E.3 CF 风格设置本地化（2026-07-01）
+    kill_icon_style = {
+        en = "Kill Icon Style",
+        ["zh-cn"] = "击杀图标风格",
+    },
+    -- §13 CF 击杀音效独立开关（2026-07-01 解耦）
+    cf_kill_sound_enabled = {
+        en = "Enable CF Kill Sound (Indexed Killstreak)",
+        ["zh-cn"] = "启用 CF 击杀音效（连杀索引）",
+    },
+    BF5 = {
+        en = "Battlefield 5",
+        ["zh-cn"] = "战地 5 风格",
+    },
+    CF = {
+        en = "CrossFire",
+        ["zh-cn"] = "穿越火线",
+    },
+    -- kill_icon_enabled_CF 已移除（2026-07-01：统一为 kill_icon_enabled 总开关）
+    -- BF5 / CF 风格子分组标题
+    icon_settings_bf5 = {
+        en = "Battlefield 5 Icon Settings",
+        ["zh-cn"] = "战地 5 图标设置",
+    },
+    icon_settings_cf = {
+        en = "CrossFire Icon Settings",
+        ["zh-cn"] = "穿越火线图标设置",
+    },
+    cf_killstreak_max = {
+        en = "CF Killstreak Max (10-30)",
+        ["zh-cn"] = "CF 连杀计数上限 (10-30)",
+    },
+    kill_icon_transparency_CF = {
+        en = "CF Icon Transparency",
+        ["zh-cn"] = "CF 图标透明度",
+    },
+    kill_icon_size_CF = {
+        en = "CF Icon Size",
+        ["zh-cn"] = "CF 图标大小",
+    },
+    kill_icon_vertical_position_CF = {
+        en = "CF Icon Vertical Position",
+        ["zh-cn"] = "CF 图标垂直位置",
+    },
+    kill_icon_horizontal_position_CF = {
+        en = "CF Icon Horizontal Position",
+        ["zh-cn"] = "CF 图标水平位置",
+    },
+    -- kill_icon_duration_CF 已重命名为 cf_killstreak_reset_time（2026-07-01：迁移到通用设置）
+    cf_killstreak_reset_time = {
+        en = "CF Killstreak Reset Time (1.0s-3.0s, also icon display duration)",
+        ["zh-cn"] = "CF 连杀计数器重置时间 (1.0s-3.0s，同时控制图标显示时长)",
     },
     -- 游戏选项本地化
     BF1 = {

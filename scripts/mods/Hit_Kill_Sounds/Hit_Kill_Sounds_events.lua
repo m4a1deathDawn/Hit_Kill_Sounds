@@ -25,6 +25,193 @@ local COMPANION_ATTACK_TYPES = {
     [AttackSettings.attack_types.companion_dog] = true,
 }
 
+-- 目标类型检测函数（必须放在 §13.C.2 _cf_on_kill / _cf_on_boss_kill 之前！
+--   Lua 5.4 闭包规则：函数定义时只捕获当前可见的 upvalues。
+--   原 line 670 位置太靠后，导致 _cf_on_kill（line 100）闭包内 is_target_valid 是 nil）
+-- target_setting: "all" | "elite" | "special" | "elite_special_boss"
+local function is_target_valid(breed_or_nil, target_setting)
+    if not target_setting or target_setting == "all" then
+        return true
+    end
+
+    if not breed_or_nil then
+        return false
+    end
+
+    local tags = breed_or_nil.tags
+    if not tags then
+        return false
+    end
+
+    if target_setting == "elite" then
+        return tags.elite == true
+    elseif target_setting == "special" then
+        return tags.special == true
+    elseif target_setting == "elite_special_boss" then
+        return tags.elite == true or tags.special == true or tags.monster == true or tags.captain == true
+    end
+
+    return true
+end
+
+-- §13.B CF 资源探测
+-- 默认值基于 2026-07-01 实际资源数，作为 scan 失败兜底：
+--   9 个普通音效（killsound_cf_01..09.wav）+ 1 个 boss 音（killsound_cf_boss.wav）
+--   6 个普通图标（kill1..6.png）+ 1 个首杀爆头（headshot_gold.png）
+local CF_KILL_SOUNDS_MAX = 9    -- 默认 9
+local CF_BOSS_SOUND_PATH = "KillSounds/cf/killsound_cf_boss.wav"
+
+-- §13.C 图标资源（key=数字索引 "1"~"30"，特殊 key="headshot_gold"）
+local CF_KILL_ICONS_MAX = 6     -- 默认 6
+local cf_icon_tex = {}            -- cf_icon_tex[1]..cf_icon_tex[30]，cf_icon_tex["headshot_gold"]
+
+-- 启动时尝试扫描（用户后续补 assets 时自动识别；失败时回退到默认值）
+-- 关键：
+--   1. DMF Mod 沙箱里裸 io 全局不可用，必须走 Mods.lua.io（参考 player.lua line 4/18）
+--   2. Mod 沙箱 cwd 是 binaries 目录（player.lua line 5 `cd` 实证），所以相对路径从 binaries 起算
+local function _scan_cf_assets()
+    -- 扫描音效：cwd = binaries 目录，audio 在 ../mods/Hit_Kill_Sounds/audio/
+    local handle = Mods.lua.io.popen and Mods.lua.io.popen('dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\KillSounds\\cf\\killsound_cf_*.wav" 2>nul')
+    if handle then
+        for line in handle:lines() do
+            -- 跳过 boss 文件
+            if not line:match("^killsound_cf_boss%.wav$") then
+                local num = tonumber(line:match("^killsound_cf_(%d+)%.wav$"))
+                if num and num > CF_KILL_SOUNDS_MAX then
+                    CF_KILL_SOUNDS_MAX = num  -- 只在 scan 找到更多时 override
+                end
+            end
+        end
+        handle:close()
+    end
+
+    -- boss 文件存在性
+    local boss_handle = Mods.lua.io.open and Mods.lua.io.open("../mods/Hit_Kill_Sounds/audio/KillSounds/cf/killsound_cf_boss.wav", "r")
+    if not boss_handle then
+        CF_BOSS_SOUND_PATH = nil  -- 不存在时禁用 boss 音
+    end
+    if boss_handle then boss_handle:close() end
+end
+_scan_cf_assets()
+
+-- §13.B.4 图标 HTTP 加载（mod 加载阶段）
+local function _preload_cf_icons()
+    if not HKS.HitKillSoundsPlayer or not HKS.HitKillSoundsPlayer.host then return end
+    local host = HKS.HitKillSoundsPlayer.host
+    local cf_base = "image?path=cartoon_preview/kill_icon/cf/"
+
+    -- 加载 kill1-30.png 到 cf_icon_tex[1..30]（探测上限）
+    for i = 1, 30 do
+        local idx = i
+        Managers.url_loader:load_texture(host .. cf_base .. "kill" .. idx .. ".png"):next(function(data)
+            if data and data.texture then
+                cf_icon_tex[idx] = data.texture
+                CF_KILL_ICONS_MAX = math.max(CF_KILL_ICONS_MAX, idx)
+            end
+        end)
+    end
+
+    -- 首杀爆头图标（独立 key，不进数字索引）
+    Managers.url_loader:load_texture(host .. cf_base .. "headshot_gold.png"):next(function(data)
+        if data and data.texture then
+            cf_icon_tex["headshot_gold"] = data.texture
+        end
+    end)
+end
+
+-- §13.C.1 CF 计数器状态
+local cf_state = {
+    kills_counter = 0,
+    last_kill_time = 0,
+    current_icon = nil,
+    icon_show_until = 0,
+}
+
+-- §13.C.4 CF 普通击杀音效播放（被 _cf_on_kill 在递增后调用）
+-- 必须放在 _cf_on_kill 之前（Lua 5.4 闭包 forward-reference 规则）
+local function _cf_play_kill_sound(is_headshot)
+    if CF_KILL_SOUNDS_MAX == 0 then return end  -- 无资源时不播
+
+    local sound_idx = math.min(cf_state.kills_counter, CF_KILL_SOUNDS_MAX)
+    local sound_path = string.format("KillSounds/cf/killsound_cf_%02d.wav", sound_idx)
+
+    local volume = HKS:get("kill_volume") or 100
+    local track = is_headshot and HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT or HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL
+    HKS.HitKillSoundsPlayer.play_file(sound_path, track, volume)
+end
+
+-- §13.C.2 CF 击杀总入口（2026-07-01 解耦版 + 守卫分轨 bug fix）
+-- 由 handle_attack_result 击杀分支调用，传入 is_headshot / breed / 激活标志
+-- 关键：
+--   - CF 音效和 CF 图标独立控制
+--   - cf_sound_active 用 sound 守卫（kill_dot / companion_kill_sound_enabled）
+--   - cf_icon_active 用 icon 守卫（kill_dot_icon / companion_kill_icon_enabled）
+--   - 任一激活就递增计数器（共享连杀），内部按激活标志分别执行
+--   - bug fix 2026-07-01：之前 CF 路径用 sound 守卫控制整个 CF 路径（包括图标），
+--     导致 kill_dot_icon=false 仍显示 CF 图标，现已修复
+local function _cf_on_kill(is_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+    if not (cf_sound_active or cf_icon_active) then return end
+
+    -- kill_target 过滤已在 handle_attack_result 调用前完成（line 860-863），此处不再重复
+
+    local now = Managers.time:time("main")
+    local duration_cf = (tonumber(HKS:get("cf_killstreak_reset_time")) or 20) / 10
+
+    -- 重置 + 递增（任一激活就走共享连杀）
+    if (now - cf_state.last_kill_time) > duration_cf then
+        cf_state.kills_counter = 0
+    end
+    cf_state.last_kill_time = now
+
+    local max_counter = HKS:get("cf_killstreak_max") or 13
+    if cf_state.kills_counter >= max_counter then
+        cf_state.kills_counter = 0
+    end
+    cf_state.kills_counter = cf_state.kills_counter + 1
+
+    -- 显示图标（仅当 CF 图标激活；决策 7：首杀爆头用金色图标）
+    if cf_icon_active then
+        if cf_state.kills_counter == 1 and is_headshot and cf_icon_tex["headshot_gold"] then
+            cf_state.current_icon = cf_icon_tex["headshot_gold"]
+        else
+            local icon_idx = math.min(cf_state.kills_counter, CF_KILL_ICONS_MAX)
+            cf_state.current_icon = cf_icon_tex[icon_idx]
+        end
+        cf_state.icon_show_until = now + duration_cf
+    end
+
+    -- 播放 CF 音效（仅当 CF 音效激活）
+    if cf_sound_active then
+        _cf_play_kill_sound(is_headshot)
+    end
+end
+
+-- §13.C.3 Boss 击杀（不递增 CF 计数器，固定播 boss 音 + 显示金色图标；2026-07-01 解耦版 + 守卫分轨 bug fix）
+local function _cf_on_boss_kill(is_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+    if not (cf_sound_active or cf_icon_active) then return end
+
+    -- kill_target 过滤已在 handle_attack_result 调用前完成（line 860-863），此处不再重复
+
+    -- Boss 不递增计数器（沿用 EBuyToDeep 原版）
+    -- 仅当 CF 图标激活时更新图标状态
+    if cf_icon_active then
+        if is_headshot and cf_icon_tex["headshot_gold"] then
+            cf_state.current_icon = cf_icon_tex["headshot_gold"]
+        else
+            local icon_idx = math.min(1, CF_KILL_ICONS_MAX)
+            cf_state.current_icon = cf_icon_tex[icon_idx]
+        end
+        cf_state.icon_show_until = Managers.time:time("main") + (tonumber(HKS:get("cf_killstreak_reset_time")) or 20) / 10
+    end
+
+    -- 仅当 CF 音效激活时播 boss 音（如果存在）
+    if cf_sound_active and CF_BOSS_SOUND_PATH then
+        local volume = HKS:get("kill_volume") or 100
+        local track = is_headshot and HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT or HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL
+        HKS.HitKillSoundsPlayer.play_file(CF_BOSS_SOUND_PATH, track, volume)
+    end
+end
+
 -- 声类型枚举（与 EBuyToDeepPlayer.lua:289-297 一致）
 local SOUND_TYPE = table.enum(
     "2d_sound",
@@ -511,33 +698,6 @@ local KILL_SOUNDS = {
 local HIT_COOLDOWN = 0.08
 local last_hit_time = 0
 
--- 目标类型检测函数
--- target_setting: "all" | "elite" | "special" | "elite_special_boss"
-local function is_target_valid(breed_or_nil, target_setting)
-    if not target_setting or target_setting == "all" then
-        return true
-    end
-
-    if not breed_or_nil then
-        return false
-    end
-
-    local tags = breed_or_nil.tags
-    if not tags then
-        return false
-    end
-
-    if target_setting == "elite" then
-        return tags.elite == true
-    elseif target_setting == "special" then
-        return tags.special == true
-    elseif target_setting == "elite_special_boss" then
-        return tags.elite == true or tags.special == true or tags.monster == true or tags.captain == true
-    end
-
-    return true
-end
-
 -- 音效播放通道定义在 player.lua, 通过 HKS.HitKillSoundsPlayer.TRACKS 访问
 local function get_random_sound(sounds)
     if not sounds or #sounds == 0 then
@@ -687,11 +847,14 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
     if attack_result == AttackSettings.attack_results.died then
         local is_kill_headshot = hit_weakspot == true
 
-        -- 击杀 target 过滤（同时影响音效与图标，与原行为一致）
+        -- 击杀 target 过滤解耦（2026-07-01）：音效和图标各自独立判断
+        --   kill_target         → 仅控制击杀音效生效对象（保留在 kill_sound_settings）
+        --   kill_icon_target    → 仅控制击杀图标生效对象（新增在 icon_settings）
+        -- 行为示例：kill_target="elite" + kill_icon_target="all" → 只有精英触发音效，但所有击杀都显示图标
         local kill_target_setting = HKS:get("kill_target") or "all"
-        if not is_target_valid(breed_or_nil, kill_target_setting) then
-            return
-        end
+        local kill_icon_target_setting = HKS:get("kill_icon_target") or "all"
+        local kill_sound_target_valid = is_target_valid(breed_or_nil, kill_target_setting)
+        local kill_icon_target_valid  = is_target_valid(breed_or_nil, kill_icon_target_setting)
 
         -- DoT 击杀「音效」与「图标」解耦（§14 修复）：
         --   kill_dot       → 控制 DoT 击杀【音效】（默认 true=播音）
@@ -704,13 +867,38 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         local companion_kill_sound_allowed = not (is_companion_attack and not HKS:get("companion_kill_sound_enabled"))
         local companion_kill_icon_allowed  = not (is_companion_attack and not HKS:get("companion_kill_icon_enabled"))
 
-        -- 播放击杀音效
-        if dot_sound_allowed and companion_kill_sound_allowed and HKS:get("kill_sound_enabled") then
+        -- §13.F.1 CF 音效 / CF 图标独立判断 + 守卫分轨（2026-07-01 bug fix）
+        --   解耦：cf_kill_sound_enabled（音效开关） 和 kill_icon_style=="CF"（图标开关） 独立
+        --   守卫分轨：cf_sound_active 用 sound 守卫，cf_icon_active 用 icon 守卫
+        --     → bug fix：之前 CF 路径用 sound 守卫控制整个 CF，导致 kill_dot_icon=false
+        --       仍显示 CF 图标。现在 CF 图标只受 icon 守卫控制
+        --   共享计数器：任一激活就递增，保持连杀一致性
+        local cf_sound_on = HKS:get("cf_kill_sound_enabled") and HKS:get("kill_sound_enabled")
+        local cf_icon_on  = HKS:get("kill_icon_style") == "CF" and HKS:get("kill_icon_enabled")
+
+        -- 守卫分轨（关键修复）：CF 音效用 sound 守卫，CF 图标用 icon 守卫
+        --   2026-07-01：各自叠加 target 守卫（kill_sound_target_valid / kill_icon_target_valid）
+        local cf_sound_active = cf_sound_on and kill_sound_target_valid and dot_sound_allowed and companion_kill_sound_allowed
+        local cf_icon_active  = cf_icon_on  and kill_icon_target_valid  and dot_icon_allowed  and companion_kill_icon_allowed
+        local cf_active = cf_sound_active or cf_icon_active
+
+        -- CF 路径：任一激活 → 调用 _cf_on_kill/_cf_on_boss_kill，传入激活标志
+        if cf_active then
+            local is_boss = breed_or_nil and breed_or_nil.tags and breed_or_nil.tags.monster
+            if is_boss then
+                _cf_on_boss_kill(is_kill_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+            else
+                _cf_on_kill(is_kill_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+            end
+        end
+
+        -- BF5 音效：仅当 CF 音效未激活时（叠加 kill_sound_target_valid）
+        if not cf_sound_active and kill_sound_target_valid and dot_sound_allowed and companion_kill_sound_allowed and HKS:get("kill_sound_enabled") then
             play_kill_sound(is_kill_headshot)
         end
 
-        -- 显示击杀图标
-        if dot_icon_allowed and companion_kill_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
+        -- BF5 图标：仅当 CF 图标未激活时（叠加 kill_icon_target_valid）
+        if not cf_icon_active and kill_icon_target_valid and dot_icon_allowed and companion_kill_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
             HKS.HitKillIconManager.show_icon(is_kill_headshot)
         end
 
@@ -801,8 +989,17 @@ HKS.HitKillSoundsEvents.init_damage_hooks = function()
     end)
 
     rebuild_silenced_patterns()
+    -- 注意：_preload_cf_icons 不在这里调用！
+    --   时机问题：on_all_mods_loaded 在所有 mod 加载后立即触发，
+    --   但 HitKillSoundsPlayer 启动的 HTTP 服务器可能尚未就绪 → 纹理加载静默失败
+    --   修复：把加载移到 HudHitKillCF.init（与 BFV hud.lua + EBuyToDeep multikill.lua 一致，
+    --   都是在 HUD 初始化时加载，那时 HTTP 服务器一定就绪）
 end
 
 HKS.HitKillSoundsEvents.rebuild_silenced_patterns = rebuild_silenced_patterns
+HKS.HitKillSoundsEvents._preload_cf_icons = _preload_cf_icons  -- 暴露给 HudHitKillCF.init 调用（修复时序问题）
+
+-- §13.D.2 暴露 cf_state 给 CF HUD 跨文件访问
+HKS.HitKillSoundsCFState = cf_state
 
 return HKS.HitKillSoundsEvents
