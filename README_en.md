@@ -18,6 +18,7 @@ A Darktide mod that plays hit and kill sounds from various games when you damage
 - **CF Killstreak System** (v1.1): CrossFire-themed killstreak sound + icon system, plays sounds in indexed order based on killstreak count, switchable style
 - **Style Switch** (v1.1): Toggle between "Battlefield 5 queue-based icon" and "CrossFire killstreak-style icon"
 - **Decoupled CF Sound & Icon** (v1.1): CrossFire killstreak sound is independently toggleable from icon style, supporting 4 combinations (CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5)
+- **SimpleAudio + SimpleAssets backend** (v1.2): Audio now plays through SimpleAudio by default, and icon textures load through SimpleAssets by default, with no external player executable required
 
 ## Kill Icons
 
@@ -85,23 +86,25 @@ This mod hooks `AttackReportManager:add_attack_result` to capture attack events:
 - Intercept player damage/kill events
 - Determine if it's a hit (normal/weakspot) or kill (normal/headshot)
 - Apply target filtering based on enemy type
-- Play the appropriate sound through an external audio player
+- Play the appropriate local sound through SimpleAudio
 - Call HUD system to display kill icons
 
-An external audio player (HitKillSoundsPlayer) handles sound playback via HTTP requests, supporting multi-channel audio (separate channels for hit and kill sounds).
+Starting with v1.2, audio playback uses SimpleAudio by default, and icon textures use SimpleAssets by default. The old HTTP player adapter is still kept as a compatibility fallback, but Nexus Mods release packages can omit the `bin` folder.
 
-The kill icon system preloads textures and manages a queue of 10 slots. New kills trigger entry animations that push old icons left.
+The kill icon system preloads textures through SimpleAssets and manages a queue of 10 slots. New kills trigger entry animations that push old icons left.
 
 ## Installation
 
-1. Download the mod and place it in your Darktide mods folder
-2. Enable the mod in the game's mod menu
-3. Configure your preferred sound source and volume, as well as kill icon options in the mod settings
+1. Install and enable the required mods: SimpleAudio and SimpleAssets
+2. Download this mod and place `Hit_Kill_Sounds` next to `SimpleAudio` and `SimpleAssets` in your Darktide `mods` folder
+3. Enable this mod in the game's mod menu
+4. Configure your preferred sound source and volume, as well as kill icon options in the mod settings
 
 ## Requirements
 
 - Darktide with mod support enabled
-- HitKillSoundsPlayer (bundled with this mod)
+- SimpleAudio
+- SimpleAssets
 
 ## Sound & Asset Sources
 
@@ -116,16 +119,25 @@ All hit and kill sounds are from their respective games and are used for modding
 ## Acknowledgments
 
 - **BiliBili UP EBuyToDeep** ([https://space.bilibili.com/1273948298](https://space.bilibili.com/1273948298)): For providing the external audio player solution that made this mod possible. The HitKillSoundsPlayer application is based on the concept from their EBuyToDeep_KillFeedBack mod.
+- **deluxghost** ([https://space.bilibili.com/4712698](https://space.bilibili.com/4712698)): For providing the SimpleAudio + SimpleAssets solution, allowing v1.2 to remove the external player requirement and use a cleaner local audio/texture loading path.
 
-## Audio Player
+## Backend Notes
 
-HitKillSoundsPlayer is an external audio player responsible for playing sounds via HTTP requests. The new version significantly reduces the probability of being blocked by antivirus software and firewalls, ready to use out of the box.
+Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/HitSounds` and `audio/KillSounds`, and SimpleAssets to load kill icon textures. The old HitKillSoundsPlayer / HTTP player logic remains as a compatibility fallback, but Nexus Mods release packages can omit the `bin` folder.
 
 ## License
 
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.2
+- **Migrated to the SimpleAudio audio backend**: Hit sounds, kill sounds, and CF killstreak sounds now play through SimpleAudio by default while preserving the original 4-track behavior (normal hit, headshot hit, normal kill, headshot kill). Replaying the same track stops the previous playback instance first
+- **Migrated to the SimpleAssets icon backend**: Battlefield 5 kill icons and CF killstreak icons now load through SimpleAssets by default, with the old HTTP image loader kept only as a compatibility fallback
+- **Removed runtime dependency on the `bin` external player**: Missing `bin` files no longer break mod loading. With SimpleAudio + SimpleAssets installed, the mod runs normally and is suitable for Nexus Mods packaging
+- **Fixed backend path resolution**: SimpleAudio / SimpleAssets calls now use explicit `mods/Hit_Kill_Sounds/...` cross-mod paths, preventing dependency libraries from resolving files under their own mod folders
+- **Backend status chat messages**: The mod now prints a one-time in-chat message when audio or icon backends are first used, making it clear whether SimpleAudio/SimpleAssets or legacy fallback is active
+- **Core gameplay logic preserved**: Hit/kill detection, DoT detection, companion attack handling, CF killstreak logic, and Wwise game-sound silencing hooks were not rewritten; only playback and texture loading backends changed
 
 ### v1.1
 - **New CF (CrossFire) killstreak system**: Ported from the EBuyToDeep_KillFeedBack mod. Added 10 kill sound files (`killsound_cf_01..09.wav` + `killsound_cf_boss.wav` under `audio/KillSounds/cf/`) and 7 kill icons (`kill1..6.png` + `headshot_gold.png` under `cartoon_preview/kill_icon/cf/`). Unlike the random-play behavior of normal kill sounds, CF sounds play in killstreak order (killsound_cf_01→02→…→09→wrap to 01)

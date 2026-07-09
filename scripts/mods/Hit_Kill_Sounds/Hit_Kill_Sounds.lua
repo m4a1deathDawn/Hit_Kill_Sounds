@@ -2,6 +2,8 @@ local HKS = get_mod("Hit_Kill_Sounds")
 
 -- 使用 io_dofile 加载其他模块
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_player")
+HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_audio_backend")
+HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_assets_backend")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_events")
 
 -- HUD元素配置
@@ -54,14 +56,24 @@ end
 
 HKS.stop_player = function()
     if HKS.HitKillSoundsPlayer then
-        HKS.HitKillSoundsPlayer.stop_file(1)
-        HKS.HitKillSoundsPlayer.stop_file(2)
-        HKS.HitKillSoundsPlayer.stop_file(3)
-        HKS.HitKillSoundsPlayer.stop_file(4)
+        if HKS.HitKillSoundsPlayer.stop_all then
+            HKS.HitKillSoundsPlayer.stop_all()
+        else
+            HKS.HitKillSoundsPlayer.stop_file(1)
+            HKS.HitKillSoundsPlayer.stop_file(2)
+            HKS.HitKillSoundsPlayer.stop_file(3)
+            HKS.HitKillSoundsPlayer.stop_file(4)
+        end
     end
 end
 
 HKS.on_all_mods_loaded = function()
+    if HKS.HitKillSoundsAudioBackend then
+        HKS.HitKillSoundsAudioBackend.init()
+    end
+    if HKS.HitKillSoundsAssetsBackend then
+        HKS.HitKillSoundsAssetsBackend.init()
+    end
     if HKS.HitKillSoundsEvents then
         HKS.HitKillSoundsEvents:init_damage_hooks()
     end
@@ -71,10 +83,14 @@ end
 HKS.on_setting_changed = function(setting_id)
     if setting_id == "enabled" and HKS:get("enabled") == false then
         if HKS.HitKillSoundsPlayer then
-            HKS.HitKillSoundsPlayer.stop_file(1)
-            HKS.HitKillSoundsPlayer.stop_file(2)
-            HKS.HitKillSoundsPlayer.stop_file(3)
-            HKS.HitKillSoundsPlayer.stop_file(4)
+            if HKS.HitKillSoundsPlayer.stop_all then
+                HKS.HitKillSoundsPlayer.stop_all()
+            else
+                HKS.HitKillSoundsPlayer.stop_file(1)
+                HKS.HitKillSoundsPlayer.stop_file(2)
+                HKS.HitKillSoundsPlayer.stop_file(3)
+                HKS.HitKillSoundsPlayer.stop_file(4)
+            end
         end
     elseif setting_id == "game_hit_sound_enabled" or setting_id == "game_kill_sound_enabled" then
         if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.rebuild_silenced_patterns then

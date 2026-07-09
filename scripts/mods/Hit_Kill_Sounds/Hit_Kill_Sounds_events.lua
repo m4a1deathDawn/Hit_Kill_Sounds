@@ -95,7 +95,7 @@ end
 _scan_cf_assets()
 
 -- §13.B.4 图标 HTTP 加载（mod 加载阶段）
-local function _preload_cf_icons()
+local function _preload_cf_icons_legacy()
     if not HKS.HitKillSoundsPlayer or not HKS.HitKillSoundsPlayer.host then return end
     local host = HKS.HitKillSoundsPlayer.host
     local cf_base = "image?path=cartoon_preview/kill_icon/cf/"
@@ -117,6 +117,16 @@ local function _preload_cf_icons()
             cf_icon_tex["headshot_gold"] = data.texture
         end
     end)
+end
+
+local function _preload_cf_icons()
+    if HKS.HitKillSoundsAssetsBackend then
+        HKS.HitKillSoundsAssetsBackend.load_cf_icons(cf_icon_tex, function(max_loaded)
+            CF_KILL_ICONS_MAX = math.max(CF_KILL_ICONS_MAX, max_loaded)
+        end, _preload_cf_icons_legacy)
+    else
+        _preload_cf_icons_legacy()
+    end
 end
 
 -- §13.C.1 CF 计数器状态
