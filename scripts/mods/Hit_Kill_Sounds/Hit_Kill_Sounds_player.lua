@@ -1,3 +1,4 @@
+-- luacheck: globals get_mod Mods cjson Managers
 local HKS = get_mod("Hit_Kill_Sounds")
 HKS.HitKillSoundsPlayer = {}
 
@@ -10,23 +11,58 @@ local hks_path = mods_path .. "/Hit_Kill_Sounds/"
 local player_path = hks_path .. "bin/"
 local audio_path = hks_path .. "audio/"
 
--- 启动音频播放器
+local function file_exists(path)
+    local handle = Mods.lua.io.open(path, "rb")
+
+    if handle then
+        handle:close()
+        return true
+    end
+
+    return false
+end
+
+local function read_port_config(path)
+    local port_handle = Mods.lua.io.open(path, "rb")
+
+    if not port_handle then
+        return nil
+    end
+
+    local port_json = port_handle:read("*a")
+    port_handle:close()
+
+    if not port_json or port_json == "" then
+        return nil
+    end
+
+    local ok, config = pcall(cjson.decode, port_json)
+
+    if not ok then
+        return nil
+    end
+
+    return config
+end
+
+-- legacy HTTP 播放器。bin 不存在时禁用，避免 N 网发布包加载失败。
 local bat_path = player_path .. "StartHitKillSoundsPlayer.bat"
-Mods.lua.io.popen('"' .. bat_path .. '"'):close()
+local port_config = read_port_config(player_path .. "port.json")
+local legacy_available = file_exists(bat_path) and port_config ~= nil
+local host = nil
 
--- 读取端口配置
-local port_handle = Mods.lua.io.open(player_path .. "port.json", "rb")
-local port_json = port_handle and port_handle:read("*a")
-port_handle:close()
-local config = cjson.decode(port_json)
+if legacy_available then
+    Mods.lua.io.popen('"' .. bat_path .. '"'):close()
 
-local port = config and config.port or 42213
-local host = string.format("http://localhost:%s/", port)
+    local port = port_config and port_config.port or 42213
+    host = string.format("http://localhost:%s/", port)
+end
 
 HKS.HitKillSoundsPlayer.host = host
+HKS.HitKillSoundsPlayer.legacy_available = legacy_available
 
 HKS.HitKillSoundsPlayer.check_player_running = function()
-    if Managers.backend ~= nil then
+    if host and Managers.backend ~= nil then
         Managers.backend:url_request(host, {
             method = "POST",
             body = {
@@ -64,7 +100,7 @@ HKS.HitKillSoundsPlayer.play_file = function(
         file_path = audio_path .. path
     }
 
-    if Managers.backend ~= nil then
+    if host and Managers.backend ~= nil then
         Managers.backend:url_request(host, {
             method = "POST",
             body = request_body
@@ -73,7 +109,7 @@ HKS.HitKillSoundsPlayer.play_file = function(
 end
 
 HKS.HitKillSoundsPlayer.stop_file = function(playing_trackid)
-    if Managers.backend ~= nil then
+    if host and Managers.backend ~= nil then
         Managers.backend:url_request(host, {
             method = "POST",
             body = {

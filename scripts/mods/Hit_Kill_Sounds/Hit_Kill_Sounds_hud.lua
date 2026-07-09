@@ -105,7 +105,7 @@ HKS.HitKillIconManager.show_icon = function(is_headshot)
 end
 
 -- 预加载纹理
-local function preload_textures()
+local function preload_textures_legacy()
     local host = HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.host
     if not host then
         return
@@ -132,6 +132,14 @@ local function preload_textures()
             _textures.circle = data.texture
         end
     end)
+end
+
+local function preload_textures()
+    if HKS.HitKillSoundsAssetsBackend then
+        HKS.HitKillSoundsAssetsBackend.load_bf5_icons(_textures, preload_textures_legacy)
+    else
+        preload_textures_legacy()
+    end
 end
 
 -- 场景图定义
