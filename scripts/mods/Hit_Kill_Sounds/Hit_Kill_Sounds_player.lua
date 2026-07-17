@@ -50,26 +50,57 @@ local bat_path = player_path .. "StartHitKillSoundsPlayer.bat"
 local port_config = read_port_config(player_path .. "port.json")
 local legacy_available = file_exists(bat_path) and port_config ~= nil
 local host = nil
+local player_started = false
 
 if legacy_available then
-    Mods.lua.io.popen('"' .. bat_path .. '"'):close()
-
     local port = port_config and port_config.port or 42213
     host = string.format("http://localhost:%s/", port)
 end
 
+local function ensure_player_started()
+    if not legacy_available then
+        return false
+    end
+
+    if player_started then
+        return true
+    end
+
+    local ok = pcall(function()
+        Mods.lua.io.popen('"' .. bat_path .. '"'):close()
+    end)
+
+    if not ok then
+        return false
+    end
+
+    player_started = true
+    return true
+end
+
 HKS.HitKillSoundsPlayer.host = host
 HKS.HitKillSoundsPlayer.legacy_available = legacy_available
+HKS.HitKillSoundsPlayer.start_player = ensure_player_started
 
 HKS.HitKillSoundsPlayer.check_player_running = function()
-    if host and Managers.backend ~= nil then
+    if not ensure_player_started() then
+        return false
+    end
+
+    if not host or Managers.backend == nil then
+        return false
+    end
+
+    local ok = pcall(function()
         Managers.backend:url_request(host, {
             method = "POST",
             body = {
                 method = "test",
             }
         })
-    end
+    end)
+
+    return ok
 end
 
 -- 音效播放通道
@@ -92,6 +123,10 @@ HKS.HitKillSoundsPlayer.play_file = function(
 )
     track_id = track_id or TRACKS.HIT_NORMAL
 
+    if not ensure_player_started() or not host or Managers.backend == nil then
+        return false
+    end
+
     local request_body = {
         method = "play_file",
         playing_trackid = track_id,
@@ -100,16 +135,22 @@ HKS.HitKillSoundsPlayer.play_file = function(
         file_path = audio_path .. path
     }
 
-    if host and Managers.backend ~= nil then
+    local ok = pcall(function()
         Managers.backend:url_request(host, {
             method = "POST",
             body = request_body
         })
-    end
+    end)
+
+    return ok
 end
 
 HKS.HitKillSoundsPlayer.stop_file = function(playing_trackid)
-    if host and Managers.backend ~= nil then
+    if not player_started or not host or Managers.backend == nil then
+        return false
+    end
+
+    local ok = pcall(function()
         Managers.backend:url_request(host, {
             method = "POST",
             body = {
@@ -117,7 +158,9 @@ HKS.HitKillSoundsPlayer.stop_file = function(playing_trackid)
                 playing_trackid = playing_trackid
             }
         })
-    end
+    end)
+
+    return ok
 end
 
 return HKS.HitKillSoundsPlayer
