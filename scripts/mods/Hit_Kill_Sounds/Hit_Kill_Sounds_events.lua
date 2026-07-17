@@ -1,6 +1,8 @@
+-- luacheck: globals get_mod Mods Managers ScriptUnit CLASS Unit Vector3
 local HKS = get_mod("Hit_Kill_Sounds")
 
 HKS.HitKillSoundsEvents = {}
+local damage_hooks_initialized = false
 
 -- 引入AttackSettings用于攻击结果检测
 local AttackSettings = require("scripts/settings/damage/attack_settings")
@@ -38,17 +40,14 @@ local function is_target_valid(breed_or_nil, target_setting)
         return false
     end
 
-    local tags = breed_or_nil.tags
-    if not tags then
-        return false
-    end
+    local tags = breed_or_nil.tags or {}
 
     if target_setting == "elite" then
         return tags.elite == true
     elseif target_setting == "special" then
         return tags.special == true
     elseif target_setting == "elite_special_boss" then
-        return tags.elite == true or tags.special == true or tags.monster == true or tags.captain == true
+        return tags.elite == true or tags.special == true or tags.monster == true or tags.captain == true or breed_or_nil.is_boss == true
     end
 
     return true
@@ -60,6 +59,7 @@ end
 --   6 个普通图标（kill1..6.png）+ 1 个首杀爆头（headshot_gold.png）
 local CF_KILL_SOUNDS_MAX = 9    -- 默认 9
 local CF_BOSS_SOUND_PATH = "KillSounds/cf/killsound_cf_boss.wav"
+local CF_HEADSHOT_SOUND_PATH = "KillSounds/cf/cf_headshot.wav"
 
 -- §13.C 图标资源（key=数字索引 "1"~"30"，特殊 key="headshot_gold"）
 local CF_KILL_ICONS_MAX = 6     -- 默认 6
@@ -69,6 +69,23 @@ local cf_icon_tex = {}            -- cf_icon_tex[1]..cf_icon_tex[30]，cf_icon_t
 -- 关键：
 --   1. DMF Mod 沙箱里裸 io 全局不可用，必须走 Mods.lua.io（参考 player.lua line 4/18）
 --   2. Mod 沙箱 cwd 是 binaries 目录（player.lua line 5 `cd` 实证），所以相对路径从 binaries 起算
+local function _file_exists(path)
+    local lua_mods = Mods and Mods.lua
+    local lua_io = lua_mods and lua_mods.io
+
+    if not lua_io or not lua_io.open then
+        return false
+    end
+
+    local handle = lua_io.open(path, "rb")
+    if not handle then
+        return false
+    end
+
+    handle:close()
+    return true
+end
+
 local function _scan_cf_assets()
     -- 扫描音效：cwd = binaries 目录，audio 在 ../mods/Hit_Kill_Sounds/audio/
     local handle = Mods.lua.io.popen and Mods.lua.io.popen('dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\KillSounds\\cf\\killsound_cf_*.wav" 2>nul')
@@ -86,22 +103,29 @@ local function _scan_cf_assets()
     end
 
     -- boss 文件存在性
-    local boss_handle = Mods.lua.io.open and Mods.lua.io.open("../mods/Hit_Kill_Sounds/audio/KillSounds/cf/killsound_cf_boss.wav", "r")
-    if not boss_handle then
+    if not _file_exists("../mods/Hit_Kill_Sounds/audio/KillSounds/cf/killsound_cf_boss.wav") then
         CF_BOSS_SOUND_PATH = nil  -- 不存在时禁用 boss 音
     end
-    if boss_handle then boss_handle:close() end
+
+    -- 首杀爆头文件独立于 killsound_cf_数字.wav 扫描，不计入连杀数量
+    if not _file_exists("../mods/Hit_Kill_Sounds/audio/KillSounds/cf/cf_headshot.wav") then
+        CF_HEADSHOT_SOUND_PATH = nil
+    end
 end
 _scan_cf_assets()
 
 -- §13.B.4 图标 HTTP 加载（mod 加载阶段）
 local function _preload_cf_icons_legacy()
+    if HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.start_player then
+        HKS.HitKillSoundsPlayer.start_player()
+    end
+
     if not HKS.HitKillSoundsPlayer or not HKS.HitKillSoundsPlayer.host then return end
     local host = HKS.HitKillSoundsPlayer.host
     local cf_base = "image?path=cartoon_preview/kill_icon/cf/"
 
-    -- 加载 kill1-30.png 到 cf_icon_tex[1..30]（探测上限）
-    for i = 1, 30 do
+    -- 当前发布包只有 1-6；不要在 legacy HTTP 路径中无条件请求 30 个文件。
+    for i = 1, CF_KILL_ICONS_MAX do
         local idx = i
         Managers.url_loader:load_texture(host .. cf_base .. "kill" .. idx .. ".png"):next(function(data)
             if data and data.texture then
@@ -137,6 +161,29 @@ local cf_state = {
     icon_show_until = 0,
 }
 
+local function reset_cf_state()
+    cf_state.kills_counter = 0
+    cf_state.last_kill_time = 0
+    cf_state.current_icon = nil
+    cf_state.icon_show_until = 0
+end
+
+local function get_kill_volume(is_headshot)
+    if is_headshot then
+        return HKS:get("kill_headshot_volume") or HKS:get("kill_volume") or 100
+    end
+
+    return HKS:get("kill_volume") or 100
+end
+
+local function get_kill_track(is_headshot, use_normal_sound)
+    if is_headshot and not use_normal_sound then
+        return HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT
+    end
+
+    return HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL
+end
+
 -- §13.C.4 CF 普通击杀音效播放（被 _cf_on_kill 在递增后调用）
 -- 必须放在 _cf_on_kill 之前（Lua 5.4 闭包 forward-reference 规则）
 local function _cf_play_kill_sound(is_headshot)
@@ -145,9 +192,25 @@ local function _cf_play_kill_sound(is_headshot)
     local sound_idx = math.min(cf_state.kills_counter, CF_KILL_SOUNDS_MAX)
     local sound_path = string.format("KillSounds/cf/killsound_cf_%02d.wav", sound_idx)
 
-    local volume = HKS:get("kill_volume") or 100
-    local track = is_headshot and HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT or HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL
+    local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
+    local volume = get_kill_volume(is_headshot)
+    local track = get_kill_track(is_headshot, use_normal_sound)
     HKS.HitKillSoundsPlayer.play_file(sound_path, track, volume)
+end
+
+local function _cf_play_headshot_special()
+    if not CF_HEADSHOT_SOUND_PATH then
+        return false
+    end
+
+    local track = HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT
+    local played = HKS.HitKillSoundsPlayer.play_file(
+        CF_HEADSHOT_SOUND_PATH,
+        track,
+        get_kill_volume(true)
+    )
+
+    return played == true
 end
 
 -- §13.C.2 CF 击杀总入口（2026-07-01 解耦版 + 守卫分轨 bug fix）
@@ -192,7 +255,17 @@ local function _cf_on_kill(is_headshot, breed_or_nil, cf_sound_active, cf_icon_a
 
     -- 播放 CF 音效（仅当 CF 音效激活）
     if cf_sound_active then
-        _cf_play_kill_sound(is_headshot)
+        local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
+        local is_first_headshot = is_headshot and cf_state.kills_counter == 1
+
+        if is_first_headshot and not use_normal_sound then
+            if not _cf_play_headshot_special() then
+                -- 特殊资源缺失或后端明确失败时回退到本轮普通 CF 首杀音效。
+                _cf_play_kill_sound(is_headshot)
+            end
+        else
+            _cf_play_kill_sound(is_headshot)
+        end
     end
 end
 
@@ -216,31 +289,12 @@ local function _cf_on_boss_kill(is_headshot, breed_or_nil, cf_sound_active, cf_i
 
     -- 仅当 CF 音效激活时播 boss 音（如果存在）
     if cf_sound_active and CF_BOSS_SOUND_PATH then
-        local volume = HKS:get("kill_volume") or 100
-        local track = is_headshot and HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT or HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL
+        local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
+        local volume = get_kill_volume(is_headshot)
+        local track = get_kill_track(is_headshot, use_normal_sound)
         HKS.HitKillSoundsPlayer.play_file(CF_BOSS_SOUND_PATH, track, volume)
     end
 end
-
--- 声类型枚举（与 EBuyToDeepPlayer.lua:289-297 一致）
-local SOUND_TYPE = table.enum(
-    "2d_sound",
-    "3d_sound",
-    "start_stop_event",
-    "external_sound",
-    "source_sound",
-    "unit_sound",
-    "unknown_userdata_sound"
-)
-
--- 声类型映射：第二个参数（position_or_unit_or_id）的 Lua 类型 → SOUND_TYPE
-local sound_type_map = {
-    ["nil"]     = SOUND_TYPE["2d_sound"],
-    ["boolean"] = SOUND_TYPE["start_stop_event"],
-    ["number"]  = SOUND_TYPE["source_sound"],
-    ["Vector3"] = SOUND_TYPE["3d_sound"],
-    ["Unit"]    = SOUND_TYPE["unit_sound"],
-}
 
 -- 命中/击杀 Wwise 事件名 pattern（基于 D:\暗潮mod\scripts 源码 grep 证据，2026-06-04 回填）：
 --   - "melee_hits" 覆盖 wwise/events/weapon/play_melee_hits_* 全部 25+ 事件（近战物理命中音，§11）
@@ -702,6 +756,16 @@ local KILL_SOUNDS = {
         },
         headshot = {},  -- 缺 headshot，fallback 到 normal
     },
+    CODBO7 = {
+        normal = {
+            "KillSounds/CODBO7/k_bo7-01.wav",
+            "KillSounds/CODBO7/k_bo7-02.wav",
+            "KillSounds/CODBO7/k_bo7-03.wav",
+        },
+        headshot = {
+            "KillSounds/CODBO7/k_bo7_headshot.wav",
+        },
+    },
 }
 
 -- 命中间隔控制（秒）
@@ -765,13 +829,15 @@ end
 local function play_kill_sound(is_headshot)
     local TRACKS = HKS.HitKillSoundsPlayer.TRACKS
     local game
+    local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
+
     if is_headshot then
         game = HKS:get("kill_headshot_game") or HKS:get("kill_game") or "BF1"
     else
         game = HKS:get("kill_game_normal") or HKS:get("kill_game") or "BF1"
     end
-    local volume = HKS:get("kill_volume") or 100
-    local sound_type = is_headshot and "headshot" or "normal"
+    local volume = get_kill_volume(is_headshot)
+    local sound_type = is_headshot and not use_normal_sound and "headshot" or "normal"
     local sounds = KILL_SOUNDS[game]
 
     if not sounds then
@@ -789,7 +855,7 @@ local function play_kill_sound(is_headshot)
 
     local sound_file = get_random_sound(sound_list)
     if sound_file then
-        local track = is_headshot and TRACKS.KILL_HEADSHOT or TRACKS.KILL_NORMAL
+        local track = is_headshot and not use_normal_sound and TRACKS.KILL_HEADSHOT or TRACKS.KILL_NORMAL
         HKS.HitKillSoundsPlayer.play_file(sound_file, track, volume)
     end
 end
@@ -894,7 +960,7 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
         -- CF 路径：任一激活 → 调用 _cf_on_kill/_cf_on_boss_kill，传入激活标志
         if cf_active then
-            local is_boss = breed_or_nil and breed_or_nil.tags and breed_or_nil.tags.monster
+            local is_boss = breed_or_nil and breed_or_nil.is_boss == true
             if is_boss then
                 _cf_on_boss_kill(is_kill_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
             else
@@ -965,37 +1031,27 @@ end
 
 -- 初始化Damage hook
 HKS.HitKillSoundsEvents.init_damage_hooks = function()
+    if damage_hooks_initialized then
+        return
+    end
+
+    damage_hooks_initialized = true
+
     HKS:hook(CLASS.AttackReportManager, "add_attack_result", function(func, self, damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike, ...)
         func(self, damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike, ...)
         handle_attack_result(damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike)
     end)
 
-    -- 钩住 Wwise 事件触发器，按 setting 静音游戏自带的命中/击杀音效
-    -- 注意：trigger_resource_event 必须按声类型（2d/3d/unit/source/start_stop）传不同数量参数，
-    -- 多传参数会被 Wwise 当作 source_id 解释并触发 "Bad Source Id parameter" 崩溃。
-    -- 实现参考：EBuyToDeepPlayer.lua:425-459
-    HKS:hook(CLASS.WwiseWorld, "trigger_resource_event", function(func, wwise_world, wwise_event_name, position_or_unit_or_id, optional_a, optional_b)
+    -- 钩住 Wwise 事件触发器，按 setting 静音游戏自带的命中/击杀音效。
+    -- 使用 vararg 原样转发，避免把 Stingray Unit/Vector3 userdata 当作普通 Lua type，
+    -- 也避免丢失 source id、Unit、Vector3 以及 start/stop event 的附加参数。
+    -- 该转发方式与 SimpleAudio/.../wwise/hooks.lua 的实现一致。
+    HKS:hook(CLASS.WwiseWorld, "trigger_resource_event", function(func, wwise_world, wwise_event_name, ...)
         if is_event_silenced(wwise_event_name) then
             return
         end
 
-        local var_type = type(position_or_unit_or_id)
-        local sound_type = sound_type_map[var_type]
-
-        if sound_type == SOUND_TYPE["2d_sound"] then
-            return func(wwise_world, wwise_event_name)
-        elseif sound_type == SOUND_TYPE["3d_sound"] then
-            return func(wwise_world, wwise_event_name, position_or_unit_or_id)
-        elseif sound_type == SOUND_TYPE["start_stop_event"] then
-            return func(wwise_world, wwise_event_name, position_or_unit_or_id, optional_a, optional_b)
-        elseif sound_type == SOUND_TYPE["source_sound"] then
-            return func(wwise_world, wwise_event_name, position_or_unit_or_id)
-        elseif sound_type == SOUND_TYPE["unit_sound"] then
-            return func(wwise_world, wwise_event_name, position_or_unit_or_id, optional_a)
-        end
-
-        -- 兜底：未识别声类型 → 安全按 2 个参数调用（最少破坏性）
-        return func(wwise_world, wwise_event_name)
+        return func(wwise_world, wwise_event_name, ...)
     end)
 
     rebuild_silenced_patterns()
@@ -1008,6 +1064,7 @@ end
 
 HKS.HitKillSoundsEvents.rebuild_silenced_patterns = rebuild_silenced_patterns
 HKS.HitKillSoundsEvents._preload_cf_icons = _preload_cf_icons  -- 暴露给 HudHitKillCF.init 调用（修复时序问题）
+HKS.HitKillSoundsEvents.reset_cf_state = reset_cf_state
 
 -- §13.D.2 暴露 cf_state 给 CF HUD 跨文件访问
 HKS.HitKillSoundsCFState = cf_state

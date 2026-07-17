@@ -19,6 +19,8 @@ A Darktide mod that plays hit and kill sounds from various games when you damage
 - **Style Switch** (v1.1): Toggle between "Battlefield 5 queue-based icon" and "CrossFire killstreak-style icon"
 - **Decoupled CF Sound & Icon** (v1.1): CrossFire killstreak sound is independently toggleable from icon style, supporting 4 combinations (CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5)
 - **SimpleAudio + SimpleAssets backend** (v1.2): Audio now plays through SimpleAudio by default, and icon textures load through SimpleAssets by default, with no external player executable required
+- **CODBO7 kill sounds** (v1.3): Normal kills randomly use three variants and headshot kills use a dedicated file; CODBO7 is available only in kill-source dropdowns
+- **Custom Mourningstar BGM** (v1.3): Optionally play six local MP3 tracks in the normal `hub` and adjust their volume independently
 
 ## Kill Icons
 
@@ -72,6 +74,7 @@ Icon assets: CrossFire killstreak icons
 | Call of Duty: MW 3 | 1 | 1 | 1 | 1 |
 | The Finals | 3 variants | 5 variants | 1 | 1 |
 | Overwatch | 1 | 1 | 2 variants | 1 |
+| Call of Duty: Black Ops 7 | — | — | 3 variants | 1 |
 | Call of Duty: Warzone | 2 variants | → normal | 1 | → normal |
 | Call of Duty: Warzone 2 | 1 | → normal | 2 variants | → normal |
 | Delta Force | 1 | → normal | 1 | 1 |
@@ -93,12 +96,23 @@ Starting with v1.2, audio playback uses SimpleAudio by default, and icon texture
 
 The kill icon system preloads textures through SimpleAssets and manages a queue of 10 slots. New kills trigger entry animations that push old icons left.
 
+## Custom Mourningstar BGM (v1.3)
+
+Enable `lobby_bgm_enabled` in the **Custom Mourningstar BGM** settings group to play
+`audio/BGM/Lobby_BGM1.mp3` through `Lobby_BGM6.mp3`, but only when
+`Managers.state.game_mode:game_mode_name() == "hub"`. A track is selected randomly on hub entry, and the next track is selected from the other files when playback finishes.
+
+- Disabled by default; it does not run in missions, the main menu, training grounds, the shooting range, or `prologue_hub`
+- `lobby_bgm_volume` ranges from 0 to 100 in steps of 5; changing it during playback updates the active playback instance without restarting the track
+- Requires **SimpleAudio** `play_file` and uses `audio_type = "music"`, so master and music volume settings still apply
+- The mod only attempts to take over native hub music after a dedicated `play_id` is returned; missing SimpleAudio, missing files, or playback failure leave native music unchanged
+
 ## Installation
 
 1. Install and enable the required mods: SimpleAudio and SimpleAssets
 2. Download this mod and place `Hit_Kill_Sounds` next to `SimpleAudio` and `SimpleAssets` in your Darktide `mods` folder
 3. Enable this mod in the game's mod menu
-4. Configure your preferred sound source and volume, as well as kill icon options in the mod settings
+4. Configure sound sources, volumes, and kill icon options; enable **Custom Mourningstar BGM** if you want the optional hub music
 
 ## Requirements
 
@@ -123,13 +137,28 @@ All hit and kill sounds are from their respective games and are used for modding
 
 ## Backend Notes
 
-Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/HitSounds` and `audio/KillSounds`, and SimpleAssets to load kill icon textures. The old HitKillSoundsPlayer / HTTP player logic remains as a compatibility fallback, but Nexus Mods release packages can omit the `bin` folder.
+Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/HitSounds`, `audio/KillSounds`, and the v1.3 `audio/BGM` folder, and SimpleAssets to load kill icon textures. Custom hub BGM does not use the legacy HTTP player and requires SimpleAudio. The old HitKillSoundsPlayer / HTTP player logic remains as a compatibility fallback for hit/kill sounds, but Nexus Mods release packages can omit the `bin` folder.
 
 ## License
 
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.3
+- **Added CODBO7 kill sounds**: Normal kills use the random pool `k_bo7-01.wav`, `k_bo7-02.wav`, and `k_bo7-03.wav`; headshot kills use `k_bo7_headshot.wav`. CODBO7 is intentionally absent from hit-source dropdowns
+- **Added custom Mourningstar BGM**: Added `lobby_bgm_enabled` (default off) and `lobby_bgm_volume` (0-100, default 100, step 5). Six MP3 tracks play only in the normal `hub`, with adjacent tracks never repeating immediately
+- **Added safe lifecycle and failure handling**: The BGM stores and stops only its own SimpleAudio `play_id`, uses a generation token to prevent stale completion callbacks from restarting playback, and restores official music on hub exit, setting disable, master-switch disable, or unload. Missing SimpleAudio, missing files, and playback failures never mute official music
+- **Native hub music POC scope**: The first implementation covers the official `music_zone` state as `None` and does not modify `music_game_state`, official source, SimpleAudio, or SimpleAssets
+
+### v1.25
+- **Improved audio backend handling**: SimpleAudio is preferred when available; the legacy HTTP audio player starts on demand only when fallback is needed. Per-frame request limits and a minimum same-track interval reduce the risk of high-frequency playback stutter while preserving the legacy fallback path
+- **Fixed Wwise argument forwarding**: Wwise hook arguments are forwarded with varargs so Unit, Vector3, source IDs, and additional parameters are preserved
+- **Fixed Boss and state management**: Boss detection consistently uses `breed.is_boss`; setting, master-switch, and HUD-toggle changes clear existing icons and CF killstreak state; resource-loading and hook initialization guards prevent duplicate setup
+- **Fixed asset loading paths**: Corrected BF5/CF icon paths and added existence checks for CF icon and sound assets to avoid requesting missing files unconditionally
+- **Added headshot kill settings**: Added `kill_headshot_use_normal` and `kill_headshot_volume` (0-100). When enabled, headshot kills still use the game selected by `kill_headshot_game` but play that game's normal kill sound; normal kills continue to use `kill_game_normal`
+- **Added the CF first-kill headshot sound**: A headshot as the first kill in a CF killstreak plays `audio/KillSounds/cf/cf_headshot.wav`, falling back to `killsound_cf_01.wav` if the special asset is missing or playback fails. The special file is excluded from the normal numeric CF sound scan, and Boss kills do not trigger it
+- **Improved backend diagnostics**: The first use of an audio or icon backend is reported in chat. The first use of the legacy HTTP audio player also displays a diagnostic asking users with SimpleAudio/SimpleAssets installed to report the unexpected fallback
 
 ### v1.2
 - **Migrated to the SimpleAudio audio backend**: Hit sounds, kill sounds, and CF killstreak sounds now play through SimpleAudio by default while preserving the original 4-track behavior (normal hit, headshot hit, normal kill, headshot kill). Replaying the same track stops the previous playback instance first

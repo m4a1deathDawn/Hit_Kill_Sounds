@@ -1,7 +1,7 @@
 local HKS = get_mod("Hit_Kill_Sounds")
 
 -- 游戏选项列表（使用本地化文本）
-local GAME_OPTIONS = {
+local HIT_GAME_OPTIONS = {
     {text = "Battlefield 1", value = "BF1"},
     {text = "Battlefield 2042", value = "BF2042"},
     {text = "Battlefield 6", value = "BF6"},
@@ -19,6 +19,16 @@ local GAME_OPTIONS = {
     {text = "Apex Legends",              value = "APEX"},
 }
 
+-- 命中和击杀来源独立维护。CODBO7 目前只有击杀音效，不能出现在命中下拉框。
+local KILL_GAME_OPTIONS = {}
+for i, opt in ipairs(HIT_GAME_OPTIONS) do
+    KILL_GAME_OPTIONS[i] = {text = opt.text, value = opt.value}
+end
+KILL_GAME_OPTIONS[#KILL_GAME_OPTIONS + 1] = {
+    text = "Call of Duty: Black Ops 7",
+    value = "CODBO7",
+}
+
 -- 目标类型选项（使用本地化文本）
 local TARGET_OPTIONS = {
     {text = "All Enemies", value = "all"},
@@ -28,10 +38,17 @@ local TARGET_OPTIONS = {
 }
 
 -- 应用本地化到游戏选项
-for i, opt in ipairs(GAME_OPTIONS) do
+for i, opt in ipairs(HIT_GAME_OPTIONS) do
     local localized = HKS:localize(opt.value)
     if localized and localized ~= opt.value then
-        GAME_OPTIONS[i].text = localized
+        HIT_GAME_OPTIONS[i].text = localized
+    end
+end
+
+for i, opt in ipairs(KILL_GAME_OPTIONS) do
+    local localized = HKS:localize(opt.value)
+    if localized and localized ~= opt.value then
+        KILL_GAME_OPTIONS[i].text = localized
     end
 end
 
@@ -103,13 +120,13 @@ return {
                         setting_id = "hit_game_normal",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = make_localized_options(GAME_OPTIONS),
+                        options = make_localized_options(HIT_GAME_OPTIONS),
                     },
                     {
                         setting_id = "hit_headshot_game",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = make_localized_options(GAME_OPTIONS),
+                        options = make_localized_options(HIT_GAME_OPTIONS),
                     },
                     {
                         setting_id = "hit_volume",
@@ -138,13 +155,13 @@ return {
                         setting_id = "hit_melee_normal",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = make_localized_options(GAME_OPTIONS),
+                        options = make_localized_options(HIT_GAME_OPTIONS),
                     },
                     {
                         setting_id = "hit_melee_headshot",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = make_localized_options(GAME_OPTIONS),
+                        options = make_localized_options(HIT_GAME_OPTIONS),
                     },
                     {
                         setting_id = "game_hit_sound_enabled",
@@ -180,13 +197,25 @@ return {
                         setting_id = "kill_game_normal",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = make_localized_options(GAME_OPTIONS),
+                        options = make_localized_options(KILL_GAME_OPTIONS),
                     },
                     {
                         setting_id = "kill_headshot_game",
                         type = "dropdown",
                         default_value = "BF1",
-                        options = make_localized_options(GAME_OPTIONS),
+                        options = make_localized_options(KILL_GAME_OPTIONS),
+                    },
+                    {
+                        setting_id = "kill_headshot_use_normal",
+                        type = "checkbox",
+                        default_value = false,
+                    },
+                    {
+                        setting_id = "kill_headshot_volume",
+                        type = "numeric",
+                        default_value = 100,
+                        range = {0, 100},
+                        step = 5,
                     },
                     {
                         setting_id = "kill_volume",
@@ -216,6 +245,24 @@ return {
                         setting_id = "companion_kill_sound_enabled",
                         type = "checkbox",
                         default_value = true,
+                    },
+                },
+            },
+            {
+                setting_id = "lobby_bgm_settings",
+                type = "group",
+                sub_widgets = {
+                    {
+                        setting_id = "lobby_bgm_enabled",
+                        type = "checkbox",
+                        default_value = false,
+                    },
+                    {
+                        setting_id = "lobby_bgm_volume",
+                        type = "numeric",
+                        default_value = 100,
+                        range = {0, 100},
+                        step = 5,
                     },
                 },
             },

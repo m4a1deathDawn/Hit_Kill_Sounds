@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.2{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.2{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.3{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.3{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -37,6 +37,10 @@ return {
     kill_sound_settings = {
         en = "Kill Sound Settings",
         ["zh-cn"] = "击杀音效设置",
+    },
+    lobby_bgm_settings = {
+        en = "Custom Mourningstar BGM",
+        ["zh-cn"] = "哀星号自定义 BGM",
     },
     icon_settings = {
         en = "Icon Settings",
@@ -88,6 +92,14 @@ return {
         en = "Enable Kill Sounds",
         ["zh-cn"] = "启用击杀音效",
     },
+    lobby_bgm_enabled = {
+        en = "Enable Custom Mourningstar BGM (Hub Only)",
+        ["zh-cn"] = "启用哀星号自定义 BGM（仅大厅）",
+    },
+    lobby_bgm_volume = {
+        en = "Custom Mourningstar BGM Volume",
+        ["zh-cn"] = "哀星号自定义 BGM 音量",
+    },
     kill_game = {
         en = "Kill Sound Source Game",
         ["zh-cn"] = "击杀音效来源游戏",
@@ -99,6 +111,14 @@ return {
     kill_headshot_game = {
         en = "Headshot Kill Sound Source Game",
         ["zh-cn"] = "爆头击杀音效来源游戏",
+    },
+    kill_headshot_use_normal = {
+        en = "Use Normal Sound from Headshot Game for Headshot Kills",
+        ["zh-cn"] = "爆头击杀使用爆头来源游戏的普通音效",
+    },
+    kill_headshot_volume = {
+        en = "Headshot Kill Sound Volume",
+        ["zh-cn"] = "爆头击杀音效音量",
     },
     kill_volume = {
         en = "Kill Sound Volume",
@@ -251,6 +271,10 @@ return {
     CODBO6 = {
         en = "Call of Duty: Black Ops 6",
         ["zh-cn"] = "使命召唤：黑色行动6",
+    },
+    CODBO7 = {
+        en = "Call of Duty: Black Ops 7",
+        ["zh-cn"] = "使命召唤：黑色行动7",
     },
     CODBOCW = {
         en = "Call of Duty: Black Ops Cold War",
