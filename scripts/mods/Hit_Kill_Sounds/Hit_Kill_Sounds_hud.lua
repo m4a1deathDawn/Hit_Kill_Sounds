@@ -16,6 +16,7 @@ local _textures = {
     headshot = nil,
     circle = nil,
 }
+local textures_load_started = false
 
 -- 队列数据结构
 HKS.HitKillIconManager = {
@@ -33,6 +34,19 @@ for i = 1, MAX_SLOTS do
         leaving = false,
         leaving_start_time = 0,
     }
+end
+
+HKS.HitKillIconManager.clear = function()
+    for i = 1, MAX_SLOTS do
+        local slot = HKS.HitKillIconManager._slots[i]
+        slot.active = false
+        slot.is_headshot = false
+        slot.start_time = 0
+        slot.target_x = 0
+        slot.current_x = 0
+        slot.leaving = false
+        slot.leaving_start_time = 0
+    end
 end
 
 -- 显示图标接口
@@ -106,6 +120,10 @@ end
 
 -- 预加载纹理
 local function preload_textures_legacy()
+    if HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.start_player then
+        HKS.HitKillSoundsPlayer.start_player()
+    end
+
     local host = HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.host
     if not host then
         return
@@ -135,6 +153,12 @@ local function preload_textures_legacy()
 end
 
 local function preload_textures()
+    if textures_load_started then
+        return
+    end
+
+    textures_load_started = true
+
     if HKS.HitKillSoundsAssetsBackend then
         HKS.HitKillSoundsAssetsBackend.load_bf5_icons(_textures, preload_textures_legacy)
     else
@@ -235,10 +259,28 @@ HudHitKillICON.init = function(self, parent, draw_layer, start_scale)
 end
 
 HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, input_service)
-    -- §13.D.3 BF5 风格守卫（仅在 BF5 模式渲染）
-    if HKS:get("kill_icon_style") ~= "BF5" then return end
-
     local manager = HKS.HitKillIconManager
+
+    -- 总开关、样式或图标开关关闭时，立即清除旧槽位和 widget 纹理。
+    if not HKS:get("enabled") or HKS:get("kill_icon_style") ~= "BF5" or not HKS:get("kill_icon_enabled") then
+        if manager and manager.clear then
+            manager.clear()
+        end
+
+        for i = 1, MAX_SLOTS do
+            local icon_widget = self._widgets_by_name["kill_icon_" .. i]
+            local circle_widget = self._widgets_by_name["circle_icon_" .. i]
+            if icon_widget and icon_widget.style and icon_widget.style.icon then
+                icon_widget.style.icon.material_values.texture_map = nil
+            end
+            if circle_widget and circle_widget.style and circle_widget.style.circle then
+                circle_widget.style.circle.material_values.texture_map = nil
+            end
+        end
+
+        return
+    end
+
     local now_time = Managers.time:time("main")
 
     -- 动画参数
@@ -417,6 +459,7 @@ end
 
 HudHitKillICON.draw = function(self, dt, t, ui_renderer, render_settings, input_service)
     -- §13.D.3 BF5 风格守卫
+    if not HKS:get("enabled") then return end
     if HKS:get("kill_icon_style") ~= "BF5" then return end
     if not HKS:get("kill_icon_enabled") then
         return

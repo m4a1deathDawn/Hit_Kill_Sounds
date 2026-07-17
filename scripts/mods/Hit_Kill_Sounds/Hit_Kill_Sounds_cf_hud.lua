@@ -7,6 +7,7 @@ local ICON_BASE_SIZE = 180  -- 与 EBuyToDeep ok_size 一致
 local ENTER_DURATION = 0.2  -- 淡入时长（沿用 EBuyToDeep）
 local FADE_DELAY = 2.8      -- EBuyToDeep alpha 255→0 起始时间
 local FADE_DURATION = 0.2   -- 淡出时长
+local cf_icons_load_started = false
 
 -- §13.D.2 scenegraph 定义（单图，垂直/水平位置可调）
 local scenegraph_definition = {
@@ -61,7 +62,8 @@ HudHitKillCF.init = function(self, parent, draw_layer, start_scale)
     -- §13.B.4 关键修复：纹理加载从 init_damage_hooks 移到这里
     --   原因：on_all_mods_loaded 时 HTTP 服务器可能未启动，纹理静默加载失败
     --   HUD init 时机 = 游戏开局后，HTTP 服务器已就绪（与 BFV/EBuyToDeep 一致）
-    if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents._preload_cf_icons then
+    if not cf_icons_load_started and HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents._preload_cf_icons then
+        cf_icons_load_started = true
         HKS.HitKillSoundsEvents._preload_cf_icons()
     end
 end
@@ -70,9 +72,11 @@ HudHitKillCF.update = function(self, dt, t, ui_renderer, render_settings, input_
     local widget = self._widgets_by_name.kill_icon
     local background = self._ui_scenegraph.background
 
-    -- 仅在 CF 模式下渲染（2026-07-01 修订：总开关用 kill_icon_enabled）
-    if HKS:get("kill_icon_style") ~= "CF" then return end
-    if not HKS:get("kill_icon_enabled") then return end
+    -- 仅在 CF 模式、总开关和图标开关都开启时渲染。
+    if not HKS:get("enabled") or HKS:get("kill_icon_style") ~= "CF" or not HKS:get("kill_icon_enabled") then
+        widget.style.profile.material_values.texture_map = nil
+        return
+    end
 
     local cf_state = HKS.HitKillSoundsCFState
     if not cf_state then return end
@@ -142,6 +146,7 @@ HudHitKillCF.update = function(self, dt, t, ui_renderer, render_settings, input_
 end
 
 HudHitKillCF.draw = function(self, dt, t, ui_renderer, render_settings, input_service)
+    if not HKS:get("enabled") then return end
     if HKS:get("kill_icon_style") ~= "CF" then return end
     -- 统一图标总开关（2026-07-01 修订：CF 也用 kill_icon_enabled）
     if not HKS:get("kill_icon_enabled") then return end

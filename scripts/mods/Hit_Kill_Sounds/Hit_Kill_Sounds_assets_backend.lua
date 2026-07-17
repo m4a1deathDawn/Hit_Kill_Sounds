@@ -1,4 +1,5 @@
 -- luacheck: globals get_mod
+-- luacheck: globals get_mod Mods
 local HKS = get_mod("Hit_Kill_Sounds")
 
 local AssetsBackend = {}
@@ -17,11 +18,11 @@ local function show_backend_message(message)
     end
 end
 
--- Prefer the v1.2 planned paths, then fall back to the current shipped layout.
+-- 使用当前发布包中实际存在的图标路径。
 local BF5_PRIMARY_PATHS = {
-    normal = "mods/Hit_Kill_Sounds/audio/cartoon_preview/kill_icon/BFV/kill_normal.png",
-    headshot = "mods/Hit_Kill_Sounds/audio/cartoon_preview/kill_icon/BFV/kill_headshot.png",
-    circle = "mods/Hit_Kill_Sounds/audio/cartoon_preview/kill_icon/BFV/kill_circle.png",
+    normal = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_normal.png",
+    headshot = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_headshot.png",
+    circle = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle.png",
 }
 
 local BF5_EXISTING_PATHS = {
@@ -162,14 +163,46 @@ AssetsBackend.load_bf5_icons = function(textures, fallback)
         return
     end
 
-    load_bf5_with_paths(BF5_PRIMARY_PATHS, textures, fallback_with_log, true)
+    load_bf5_with_paths(BF5_PRIMARY_PATHS, textures, fallback_with_log, false)
+end
+
+local CF_ICON_SCAN_MAX = 30
+local CF_ICON_FALLBACK_MAX = 6
+
+local function file_exists(path)
+    local lua_mods = Mods and Mods.lua
+    local lua_io = lua_mods and lua_mods.io
+
+    if not lua_io or not lua_io.open then
+        return false
+    end
+
+    local handle = lua_io.open(path, "rb")
+    if not handle then
+        return false
+    end
+
+    handle:close()
+    return true
 end
 
 local function build_cf_paths(base_path)
     local paths = {}
+    local found_count = 0
 
-    for i = 1, 30 do
-        paths[#paths + 1] = base_path .. "kill" .. i .. ".png"
+    -- 只请求实际存在的文件；扫描失败时回退到当前发布包的 1-6。
+    for i = 1, CF_ICON_SCAN_MAX do
+        local relative_path = "../mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/cf/kill" .. i .. ".png"
+        if file_exists(relative_path) then
+            paths[#paths + 1] = base_path .. "kill" .. i .. ".png"
+            found_count = found_count + 1
+        end
+    end
+
+    if found_count == 0 then
+        for i = 1, CF_ICON_FALLBACK_MAX do
+            paths[#paths + 1] = base_path .. "kill" .. i .. ".png"
+        end
     end
 
     paths[#paths + 1] = base_path .. "headshot_gold.png"
@@ -241,11 +274,11 @@ AssetsBackend.load_cf_icons = function(textures, on_loaded, fallback)
     end
 
     load_cf_with_base(
-        "mods/Hit_Kill_Sounds/audio/cartoon_preview/kill_icon/cf/",
+        "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/cf/",
         textures,
         on_loaded,
         fallback_with_log,
-        true
+        false
     )
 end
 
