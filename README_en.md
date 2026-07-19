@@ -2,6 +2,8 @@
 
 A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
 
+Current version: v1.4
+
 ## Features
 
 - **Hit Sounds**: Play different sounds when hitting enemies (normal hit vs weakspot hit)
@@ -15,12 +17,14 @@ A Darktide mod that plays hit and kill sounds from various games when you damage
 - **Volume Control**: Adjust volume independently for hit and kill sounds (0-100)
 - **Icon Customization**: Adjust icon size, color, horizontal/vertical position, and display duration
 - **Multiplayer Support**: Works correctly in both single-player and multiplayer modes
-- **CF Killstreak System** (v1.1): CrossFire-themed killstreak sound + icon system, plays sounds in indexed order based on killstreak count, switchable style
+- **CF-style streak output** (v1.1): CrossFire-themed streak sound + icon system, plays sounds in indexed order based on streak count, switchable style
 - **Style Switch** (v1.1): Toggle between "Battlefield 5 queue-based icon" and "CrossFire killstreak-style icon"
 - **Decoupled CF Sound & Icon** (v1.1): CrossFire killstreak sound is independently toggleable from icon style, supporting 4 combinations (CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5)
 - **SimpleAudio + SimpleAssets backend** (v1.2): Audio now plays through SimpleAudio by default, and icon textures load through SimpleAssets by default, with no external player executable required
 - **CODBO7 kill sounds** (v1.3): Normal kills randomly use three variants and headshot kills use a dedicated file; CODBO7 is available only in kill-source dropdowns
 - **Custom Mourningstar BGM** (v1.3): Optionally play six local MP3 tracks in the normal `hub` and adjust their volume independently
+- **Generic killstreak mechanism and burst-playback protection** (v1.35): Streak counting is independent from CF outputs, while SimpleAudio uses a bounded queue, frame-spread dispatch, and a multi-voice pool
+- **Battlefield 4-style text kill feed and independent score tally** (v1.4): Fixed-slot HUD text and cumulative score output, independent of BF5/CF sound and icon switches
 
 ## Kill Icons
 
@@ -59,6 +63,17 @@ New in v1.1! A CrossFire-themed killstreak system ported from the EBuyToDeep_Kil
 
 Icon assets: CrossFire killstreak icons
 
+## Battlefield 4-style Text Kill Feed (v1.4)
+
+Enable `bf4_feed_enabled` in the **Battlefield 4-style Text Kill Feed** settings group to display a borderless, background-free HUD text feed. It is disabled by default and requires `killstreak_enabled` to be enabled in General Settings.
+
+- Normal kill 100, headshot bonus 50, elite kill 200, special kill 250, Boss kill 500
+- A headshot special kill displays both `HEADSHOT BONUS` and `SPECIAL KILLED`, while adding 300 to the tally once
+- The newest event is at the bottom; event text is right-aligned, scores are left-aligned, and the cumulative tally stays above/right of the feed with a short punch animation
+- Supports target filtering, 1.0-3.0 second display duration, horizontal/vertical position, and 50%-150% text scale
+- The feature does not depend on CF/BF5 sound or icon switches and does not trigger the official Combat Feed event. The native game feed may show duplicate information if it is enabled at the same time
+- Disabling the feed or the killstreak mechanism immediately clears the text slots and tally without changing saved settings
+
 ## Supported Sound Sources
 
 | Game | Normal Hit | Headshot Hit | Normal Kill | Headshot Kill |
@@ -91,6 +106,7 @@ This mod hooks `AttackReportManager:add_attack_result` to capture attack events:
 - Apply target filtering based on enemy type
 - Play the appropriate local sound through SimpleAudio
 - Call HUD system to display kill icons
+- Submit a separate BF4 text-feed batch for each valid kill and update an independent score tally without triggering the official Combat Feed event
 
 Starting with v1.2, audio playback uses SimpleAudio by default, and icon textures use SimpleAssets by default. The old HTTP player adapter is still kept as a compatibility fallback, but Nexus Mods release packages can omit the `bin` folder.
 
@@ -144,6 +160,20 @@ Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/Hi
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.4
+- **Added Battlefield 4-style text kill feed**: Added an independent settings group with target filtering, 1.0-3.0 second duration, position, and scale controls; disabled by default
+- **Added independent score tally**: Normal kills score 100, headshot bonus 50, elites 200, specials 250, and Bosses 500. Multiple lines from one kill are submitted as one batch and update the tally once
+- **Fixed-slot HUD and animation**: Up to 8 fixed text slots, newest event at the bottom, official HUD text measurement, black drop shadows, and a tally fixed above/right of the feed
+- **Lifecycle guards**: Text feed and tally depend only on the generic killstreak mechanism; StateRun exit, master/feature disable, and killstreak disable clear residual state immediately
+- **Verification status**: luacheck and static logic checks have been run; the focused in-game matrix, including a Nexus package without the legacy HTTP player, remains pending
+
+### v1.35
+- **SimpleAudio burst stability**: Hit, normal-kill, headshot, CF, and Boss requests fix their path, track, volume, and priority at event time before entering a 10-item queue; each update starts at most 2 instances, with a 0.03-second minimum interval and a 0.12-second expiry window
+- **Multi-instance tracks**: SimpleAudio one-shot playback is capped at 8 active voices total, 3 hit voices, and 4 kill voices. New requests no longer unconditionally stop an older voice on the same track; low-priority normal hits are evicted first when capacity is needed
+- **Generic killstreak mechanism**: Added the enabled-by-default killstreak switch; counting is independent of CF sound/icon toggles. Legacy `cf_killstreak_max` and `cf_killstreak_reset_time` IDs remain readable in General Settings, and the reset window also controls CF icon display duration
+- **CF output guards**: Disabling the mechanism immediately stops CF sounds and icons while leaving the non-CF BF5 paths available; the first-kill headshot fallback cannot increment the counter twice
+- **Verification status**: Static checks are complete; the focused in-game matrix, including a Nexus package without the legacy HTTP player, remains pending
 
 ### v1.3
 - **Added CODBO7 kill sounds**: Normal kills use the random pool `k_bo7-01.wav`, `k_bo7-02.wav`, and `k_bo7-03.wav`; headshot kills use `k_bo7_headshot.wav`. CODBO7 is intentionally absent from hit-source dropdowns

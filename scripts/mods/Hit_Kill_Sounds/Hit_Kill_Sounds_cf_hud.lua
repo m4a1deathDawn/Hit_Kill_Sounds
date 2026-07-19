@@ -9,6 +9,23 @@ local FADE_DELAY = 2.8      -- EBuyToDeep alpha 255→0 起始时间
 local FADE_DURATION = 0.2   -- 淡出时长
 local cf_icons_load_started = false
 
+local function cf_output_enabled()
+    return HKS:get("enabled") ~= false
+        and HKS:get("killstreak_enabled") ~= false
+        and HKS:get("kill_icon_style") == "CF"
+        and HKS:get("kill_icon_enabled") ~= false
+end
+
+local function clear_cf_icon(widget)
+    if widget and widget.style and widget.style.profile then
+        widget.style.profile.material_values.texture_map = nil
+    end
+
+    if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_cf_icon_state then
+        HKS.HitKillSoundsEvents.clear_cf_icon_state()
+    end
+end
+
 -- §13.D.2 scenegraph 定义（单图，垂直/水平位置可调）
 local scenegraph_definition = {
     screen = UIWorkspaceSettings.screen,
@@ -72,20 +89,23 @@ HudHitKillCF.update = function(self, dt, t, ui_renderer, render_settings, input_
     local widget = self._widgets_by_name.kill_icon
     local background = self._ui_scenegraph.background
 
-    -- 仅在 CF 模式、总开关和图标开关都开启时渲染。
-    if not HKS:get("enabled") or HKS:get("kill_icon_style") ~= "CF" or not HKS:get("kill_icon_enabled") then
-        widget.style.profile.material_values.texture_map = nil
+    -- CF HUD 也受通用连杀开关保护；关闭后立即清除 widget 和状态残留。
+    if not cf_output_enabled() then
+        clear_cf_icon(widget)
         return
     end
 
-    local cf_state = HKS.HitKillSoundsCFState
-    if not cf_state then return end
+    local cf_state = HKS.HitKillSoundsCFIconState or HKS.HitKillSoundsCFState
+    if not cf_state then
+        clear_cf_icon(widget)
+        return
+    end
 
     local now = Managers.time:time("main")
 
     -- 图标过期处理
     if now > cf_state.icon_show_until then
-        widget.style.profile.material_values.texture_map = nil
+        clear_cf_icon(widget)
         return
     end
 
@@ -146,10 +166,10 @@ HudHitKillCF.update = function(self, dt, t, ui_renderer, render_settings, input_
 end
 
 HudHitKillCF.draw = function(self, dt, t, ui_renderer, render_settings, input_service)
-    if not HKS:get("enabled") then return end
-    if HKS:get("kill_icon_style") ~= "CF" then return end
-    -- 统一图标总开关（2026-07-01 修订：CF 也用 kill_icon_enabled）
-    if not HKS:get("kill_icon_enabled") then return end
+    if not cf_output_enabled() then
+        clear_cf_icon(self._widgets_by_name.kill_icon)
+        return
+    end
 
     local game_mode_name = Managers.state.game_mode and Managers.state.game_mode:game_mode_name()
     if game_mode_name == "hub" then return end

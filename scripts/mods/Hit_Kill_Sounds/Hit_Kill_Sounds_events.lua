@@ -3,6 +3,16 @@ local HKS = get_mod("Hit_Kill_Sounds")
 
 HKS.HitKillSoundsEvents = {}
 local damage_hooks_initialized = false
+local AudioBackend = HKS.HitKillSoundsAudioBackend
+local ScoreFeed = HKS.HitKillSoundsScoreFeed
+local AUDIO_PRIORITY = AudioBackend and AudioBackend.PRIORITY or {
+    BOSS = 0,
+    HEADSHOT_KILL = 1,
+    CF_KILL = 1,
+    KILL = 2,
+    HEADSHOT_HIT = 3,
+    HIT = 4,
+}
 
 -- 引入AttackSettings用于攻击结果检测
 local AttackSettings = require("scripts/settings/damage/attack_settings")
@@ -86,6 +96,20 @@ local function _file_exists(path)
     return true
 end
 
+-- §21 BF4 文字击杀信息使用独立目标设置，只消费已经确认的本地有效击杀。
+-- 这里不能读取 CF 音效、CF 图标、BF5 音效或 BF5 图标开关。
+local function add_bf4_score_feed(breed_or_nil, is_headshot)
+    if not ScoreFeed or HKS:get("killstreak_enabled") == false or HKS:get("bf4_feed_enabled") ~= true then
+        return
+    end
+
+    local target_setting = HKS:get("bf4_feed_target") or "all"
+
+    if is_target_valid(breed_or_nil, target_setting) then
+        ScoreFeed.add_kill(breed_or_nil, is_headshot)
+    end
+end
+
 local function _scan_cf_assets()
     -- 扫描音效：cwd = binaries 目录，audio 在 ../mods/Hit_Kill_Sounds/audio/
     local handle = Mods.lua.io.popen and Mods.lua.io.popen('dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\KillSounds\\cf\\killsound_cf_*.wav" 2>nul')
@@ -153,19 +177,114 @@ local function _preload_cf_icons()
     end
 end
 
--- §13.C.1 CF 计数器状态
-local cf_state = {
+-- §20 通用连杀状态与 CF 图标输出状态分离。
+local killstreak_state = {
     kills_counter = 0,
     last_kill_time = 0,
+}
+
+local cf_icon_state = {
     current_icon = nil,
     icon_show_until = 0,
 }
 
-local function reset_cf_state()
-    cf_state.kills_counter = 0
-    cf_state.last_kill_time = 0
-    cf_state.current_icon = nil
-    cf_state.icon_show_until = 0
+local KILLSTREAK_TIMEOUT_EVENT = "hit_kill_sounds_killstreak_timeout"
+
+local function is_killstreak_enabled()
+    -- The new setting defaults to true. Treat a missing value as enabled so existing
+    -- configurations keep the pre-1.35 CF behavior until DMF persists the new setting.
+    return HKS:get("killstreak_enabled") ~= false
+end
+
+local function get_killstreak_reset_time()
+    local reset_time = tonumber(HKS:get("cf_killstreak_reset_time")) or 20
+
+    return math.max(reset_time, 0) / 10
+end
+
+local function reset_killstreak_state()
+    killstreak_state.kills_counter = 0
+    killstreak_state.last_kill_time = 0
+end
+
+local function clear_cf_icon_state()
+    cf_icon_state.current_icon = nil
+    cf_icon_state.icon_show_until = 0
+end
+
+local function reset_kill_state()
+    reset_killstreak_state()
+    clear_cf_icon_state()
+end
+
+-- DoT and companion eligibility is evaluated from the category settings themselves,
+-- never from cf_sound_active/cf_icon_active. Target filters use the union of the two
+-- existing kill-output target settings because there is no separate streak target UI.
+local function is_killstreak_eligible(
+    breed_or_nil,
+    is_dot_damage,
+    is_companion_attack,
+    kill_sound_target_valid,
+    kill_icon_target_valid,
+    dot_sound_allowed,
+    dot_icon_allowed,
+    companion_kill_sound_allowed,
+    companion_kill_icon_allowed
+)
+    if breed_or_nil and breed_or_nil.is_boss == true then
+        return false
+    end
+
+    if not (kill_sound_target_valid or kill_icon_target_valid) then
+        return false
+    end
+
+    if is_dot_damage then
+        return dot_sound_allowed or dot_icon_allowed
+    end
+
+    if is_companion_attack then
+        return companion_kill_sound_allowed or companion_kill_icon_allowed
+    end
+
+    return true
+end
+
+local function update_killstreak(now)
+    local reset_time = get_killstreak_reset_time()
+    local last_kill_time = killstreak_state.last_kill_time
+
+    if last_kill_time > 0 and now - last_kill_time >= reset_time then
+        local previous_count = killstreak_state.kills_counter
+        killstreak_state.kills_counter = 0
+
+        if Managers and Managers.event and Managers.event.trigger then
+            Managers.event:trigger(KILLSTREAK_TIMEOUT_EVENT, previous_count)
+        end
+    elseif last_kill_time == 0 then
+        killstreak_state.kills_counter = 0
+    end
+
+    local max_counter = math.max(1, tonumber(HKS:get("cf_killstreak_max")) or 13)
+
+    if killstreak_state.kills_counter >= max_counter then
+        killstreak_state.kills_counter = 0
+    end
+
+    killstreak_state.kills_counter = killstreak_state.kills_counter + 1
+    killstreak_state.last_kill_time = now
+
+    return killstreak_state.kills_counter
+end
+
+local function queue_sound(path, track_id, volume, priority, sound_kind)
+    local backend = HKS.HitKillSoundsAudioBackend
+
+    if backend and backend.enqueue then
+        return backend.enqueue(path, track_id, volume, priority, sound_kind) == true
+    end
+
+    return false
 end
 
 local function get_kill_volume(is_headshot)
@@ -184,18 +303,21 @@ local function get_kill_track(is_headshot, use_normal_sound)
     return HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL
 end
 
--- §13.C.4 CF 普通击杀音效播放（被 _cf_on_kill 在递增后调用）
+-- §13.C.4 CF 普通击杀音效播放。streak_count 在击杀事件入口确定后传入，
+-- 因此队列调度不会重新读取变化中的连杀状态。
 -- 必须放在 _cf_on_kill 之前（Lua 5.4 闭包 forward-reference 规则）
-local function _cf_play_kill_sound(is_headshot)
+local function _cf_play_kill_sound(streak_count, is_headshot)
     if CF_KILL_SOUNDS_MAX == 0 then return end  -- 无资源时不播
 
-    local sound_idx = math.min(cf_state.kills_counter, CF_KILL_SOUNDS_MAX)
+    local sound_idx = math.min(streak_count, CF_KILL_SOUNDS_MAX)
     local sound_path = string.format("KillSounds/cf/killsound_cf_%02d.wav", sound_idx)
 
     local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
     local volume = get_kill_volume(is_headshot)
     local track = get_kill_track(is_headshot, use_normal_sound)
-    HKS.HitKillSoundsPlayer.play_file(sound_path, track, volume)
+    local sound_kind = is_headshot and "cf_kill_headshot" or "cf_kill"
+
+    queue_sound(sound_path, track, volume, AUDIO_PRIORITY.CF_KILL, sound_kind)
 end
 
 local function _cf_play_headshot_special()
@@ -204,95 +326,72 @@ local function _cf_play_headshot_special()
     end
 
     local track = HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT
-    local played = HKS.HitKillSoundsPlayer.play_file(
+    local played = queue_sound(
         CF_HEADSHOT_SOUND_PATH,
         track,
-        get_kill_volume(true)
+        get_kill_volume(true),
+        AUDIO_PRIORITY.HEADSHOT_KILL,
+        "cf_kill_headshot"
     )
 
     return played == true
 end
 
--- §13.C.2 CF 击杀总入口（2026-07-01 解耦版 + 守卫分轨 bug fix）
--- 由 handle_attack_result 击杀分支调用，传入 is_headshot / breed / 激活标志
+-- §13.C.2 CF 击杀输出消费者（§20：只消费已确定的 streak_count）
+-- 由 handle_attack_result 击杀分支调用，传入 is_headshot / streak_count / 激活标志
 -- 关键：
 --   - CF 音效和 CF 图标独立控制
 --   - cf_sound_active 用 sound 守卫（kill_dot / companion_kill_sound_enabled）
 --   - cf_icon_active 用 icon 守卫（kill_dot_icon / companion_kill_icon_enabled）
---   - 任一激活就递增计数器（共享连杀），内部按激活标志分别执行
---   - bug fix 2026-07-01：之前 CF 路径用 sound 守卫控制整个 CF 路径（包括图标），
---     导致 kill_dot_icon=false 仍显示 CF 图标，现已修复
-local function _cf_on_kill(is_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+local function _cf_on_kill(is_headshot, streak_count, cf_sound_active, cf_icon_active, now)
     if not (cf_sound_active or cf_icon_active) then return end
 
-    -- kill_target 过滤已在 handle_attack_result 调用前完成（line 860-863），此处不再重复
-
-    local now = Managers.time:time("main")
-    local duration_cf = (tonumber(HKS:get("cf_killstreak_reset_time")) or 20) / 10
-
-    -- 重置 + 递增（任一激活就走共享连杀）
-    if (now - cf_state.last_kill_time) > duration_cf then
-        cf_state.kills_counter = 0
-    end
-    cf_state.last_kill_time = now
-
-    local max_counter = HKS:get("cf_killstreak_max") or 13
-    if cf_state.kills_counter >= max_counter then
-        cf_state.kills_counter = 0
-    end
-    cf_state.kills_counter = cf_state.kills_counter + 1
-
-    -- 显示图标（仅当 CF 图标激活；决策 7：首杀爆头用金色图标）
+    -- 图标和音效都只消费同一次击杀生成的 streak_count。
     if cf_icon_active then
-        if cf_state.kills_counter == 1 and is_headshot and cf_icon_tex["headshot_gold"] then
-            cf_state.current_icon = cf_icon_tex["headshot_gold"]
+        if streak_count == 1 and is_headshot and cf_icon_tex["headshot_gold"] then
+            cf_icon_state.current_icon = cf_icon_tex["headshot_gold"]
         else
-            local icon_idx = math.min(cf_state.kills_counter, CF_KILL_ICONS_MAX)
-            cf_state.current_icon = cf_icon_tex[icon_idx]
+            local icon_idx = math.min(streak_count, CF_KILL_ICONS_MAX)
+            cf_icon_state.current_icon = cf_icon_tex[icon_idx]
         end
-        cf_state.icon_show_until = now + duration_cf
+        cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
     end
 
-    -- 播放 CF 音效（仅当 CF 音效激活）
     if cf_sound_active then
         local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
-        local is_first_headshot = is_headshot and cf_state.kills_counter == 1
+        local is_first_headshot = is_headshot and streak_count == 1
 
         if is_first_headshot and not use_normal_sound then
             if not _cf_play_headshot_special() then
                 -- 特殊资源缺失或后端明确失败时回退到本轮普通 CF 首杀音效。
-                _cf_play_kill_sound(is_headshot)
+                _cf_play_kill_sound(streak_count, is_headshot)
             end
         else
-            _cf_play_kill_sound(is_headshot)
+            _cf_play_kill_sound(streak_count, is_headshot)
         end
     end
 end
 
--- §13.C.3 Boss 击杀（不递增 CF 计数器，固定播 boss 音 + 显示金色图标；2026-07-01 解耦版 + 守卫分轨 bug fix）
-local function _cf_on_boss_kill(is_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+-- §13.C.3 Boss 击杀（不递增通用连杀计数器，但受连杀开关保护）
+local function _cf_on_boss_kill(is_headshot, cf_sound_active, cf_icon_active, now)
     if not (cf_sound_active or cf_icon_active) then return end
 
-    -- kill_target 过滤已在 handle_attack_result 调用前完成（line 860-863），此处不再重复
-
-    -- Boss 不递增计数器（沿用 EBuyToDeep 原版）
-    -- 仅当 CF 图标激活时更新图标状态
     if cf_icon_active then
         if is_headshot and cf_icon_tex["headshot_gold"] then
-            cf_state.current_icon = cf_icon_tex["headshot_gold"]
+            cf_icon_state.current_icon = cf_icon_tex["headshot_gold"]
         else
-            local icon_idx = math.min(1, CF_KILL_ICONS_MAX)
-            cf_state.current_icon = cf_icon_tex[icon_idx]
+            cf_icon_state.current_icon = cf_icon_tex[1]
         end
-        cf_state.icon_show_until = Managers.time:time("main") + (tonumber(HKS:get("cf_killstreak_reset_time")) or 20) / 10
+        cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
     end
 
-    -- 仅当 CF 音效激活时播 boss 音（如果存在）
     if cf_sound_active and CF_BOSS_SOUND_PATH then
         local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
         local volume = get_kill_volume(is_headshot)
         local track = get_kill_track(is_headshot, use_normal_sound)
-        HKS.HitKillSoundsPlayer.play_file(CF_BOSS_SOUND_PATH, track, volume)
+        local sound_kind = is_headshot and "boss_headshot" or "boss_kill"
+
+        queue_sound(CF_BOSS_SOUND_PATH, track, volume, AUDIO_PRIORITY.BOSS, sound_kind)
     end
 end
 
@@ -822,7 +921,10 @@ local function play_hit_sound(is_headshot, is_melee)
     local sound_file = get_random_sound(sound_list)
     if sound_file then
         local track = is_headshot and TRACKS.HIT_HEADSHOT or TRACKS.HIT_NORMAL
-        HKS.HitKillSoundsPlayer.play_file(sound_file, track, volume)
+        local priority = is_headshot and AUDIO_PRIORITY.HEADSHOT_HIT or AUDIO_PRIORITY.HIT
+        local sound_kind = is_headshot and "hit_headshot" or "hit_normal"
+
+        queue_sound(sound_file, track, volume, priority, sound_kind)
     end
 end
 
@@ -856,7 +958,10 @@ local function play_kill_sound(is_headshot)
     local sound_file = get_random_sound(sound_list)
     if sound_file then
         local track = is_headshot and not use_normal_sound and TRACKS.KILL_HEADSHOT or TRACKS.KILL_NORMAL
-        HKS.HitKillSoundsPlayer.play_file(sound_file, track, volume)
+        local priority = is_headshot and AUDIO_PRIORITY.HEADSHOT_KILL or AUDIO_PRIORITY.KILL
+        local sound_kind = is_headshot and "kill_headshot" or "kill_normal"
+
+        queue_sound(sound_file, track, volume, priority, sound_kind)
     end
 end
 
@@ -943,28 +1048,51 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         local companion_kill_sound_allowed = not (is_companion_attack and not HKS:get("companion_kill_sound_enabled"))
         local companion_kill_icon_allowed  = not (is_companion_attack and not HKS:get("companion_kill_icon_enabled"))
 
-        -- §13.F.1 CF 音效 / CF 图标独立判断 + 守卫分轨（2026-07-01 bug fix）
-        --   解耦：cf_kill_sound_enabled（音效开关） 和 kill_icon_style=="CF"（图标开关） 独立
-        --   守卫分轨：cf_sound_active 用 sound 守卫，cf_icon_active 用 icon 守卫
-        --     → bug fix：之前 CF 路径用 sound 守卫控制整个 CF，导致 kill_dot_icon=false
-        --       仍显示 CF 图标。现在 CF 图标只受 icon 守卫控制
-        --   共享计数器：任一激活就递增，保持连杀一致性
-        local cf_sound_on = HKS:get("cf_kill_sound_enabled") and HKS:get("kill_sound_enabled")
-        local cf_icon_on  = HKS:get("kill_icon_style") == "CF" and HKS:get("kill_icon_enabled")
+        -- §20：连杀机制是唯一计数源，CF 音效和图标只是受保护的输出消费者。
+        -- CF 输出各自保留原有音效/图标、目标、DoT 和同伴过滤，但不再决定计数器是否运行。
+        local now = Managers.time:time("main")
+        local killstreak_enabled = is_killstreak_enabled()
+        local is_boss = breed_or_nil and breed_or_nil.is_boss == true
 
-        -- 守卫分轨（关键修复）：CF 音效用 sound 守卫，CF 图标用 icon 守卫
-        --   2026-07-01：各自叠加 target 守卫（kill_sound_target_valid / kill_icon_target_valid）
+        local cf_sound_on = killstreak_enabled and HKS:get("cf_kill_sound_enabled") and HKS:get("kill_sound_enabled")
+        local cf_icon_on = killstreak_enabled and HKS:get("kill_icon_style") == "CF" and HKS:get("kill_icon_enabled")
+
         local cf_sound_active = cf_sound_on and kill_sound_target_valid and dot_sound_allowed and companion_kill_sound_allowed
         local cf_icon_active  = cf_icon_on  and kill_icon_target_valid  and dot_icon_allowed  and companion_kill_icon_allowed
         local cf_active = cf_sound_active or cf_icon_active
 
-        -- CF 路径：任一激活 → 调用 _cf_on_kill/_cf_on_boss_kill，传入激活标志
+        local streak_count = nil
+
+        if killstreak_enabled and is_killstreak_eligible(
+            breed_or_nil,
+            is_dot_damage,
+            is_companion_attack,
+            kill_sound_target_valid,
+            kill_icon_target_valid,
+            dot_sound_allowed,
+            dot_icon_allowed,
+            companion_kill_sound_allowed,
+            companion_kill_icon_allowed
+        ) then
+            streak_count = update_killstreak(now)
+        elseif not killstreak_enabled then
+            -- A setting change normally performs this reset; this guard also handles a
+            -- disabled mechanism before the next settings callback reaches the Mod.
+            reset_kill_state()
+        end
+
+        -- §21：BF4 文字信息在通用连杀更新之后独立入队。它不消费 streak_count，
+        -- 也不受 CF/BF5 音效和图标开关影响；同一次有效击杀只调用一次批量计分接口。
+        if killstreak_enabled then
+            add_bf4_score_feed(breed_or_nil, is_kill_headshot)
+        end
+
+        -- CF 路径只消费已经固定的 streak_count；Boss 不递增普通连杀计数。
         if cf_active then
-            local is_boss = breed_or_nil and breed_or_nil.is_boss == true
             if is_boss then
-                _cf_on_boss_kill(is_kill_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
-            else
-                _cf_on_kill(is_kill_headshot, breed_or_nil, cf_sound_active, cf_icon_active)
+                _cf_on_boss_kill(is_kill_headshot, cf_sound_active, cf_icon_active, now)
+            elseif streak_count then
+                _cf_on_kill(is_kill_headshot, streak_count, cf_sound_active, cf_icon_active, now)
             end
         end
 
@@ -1064,9 +1192,13 @@ end
 
 HKS.HitKillSoundsEvents.rebuild_silenced_patterns = rebuild_silenced_patterns
 HKS.HitKillSoundsEvents._preload_cf_icons = _preload_cf_icons  -- 暴露给 HudHitKillCF.init 调用（修复时序问题）
-HKS.HitKillSoundsEvents.reset_cf_state = reset_cf_state
+HKS.HitKillSoundsEvents.reset_cf_state = reset_kill_state
+HKS.HitKillSoundsEvents.reset_killstreak_state = reset_killstreak_state
+HKS.HitKillSoundsEvents.clear_cf_icon_state = clear_cf_icon_state
 
--- §13.D.2 暴露 cf_state 给 CF HUD 跨文件访问
-HKS.HitKillSoundsCFState = cf_state
+-- §20 暴露拆分后的状态；旧字段保留为仅图标状态的兼容别名。
+HKS.HitKillSoundsKillstreakState = killstreak_state
+HKS.HitKillSoundsCFIconState = cf_icon_state
+HKS.HitKillSoundsCFState = cf_icon_state
 
 return HKS.HitKillSoundsEvents
