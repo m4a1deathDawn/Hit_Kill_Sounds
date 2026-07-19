@@ -96,14 +96,71 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
-                    -- §13 CF 连杀计数器重置时间（2026-07-01 从 icon_settings_cf.kill_icon_duration_CF 重命名并迁移）
-                    -- 该值同时控制 CF 计数器重置窗口和 CF 图标显示时长（共享同一窗口，2.0s 默认）
+                    {
+                        setting_id = "killstreak_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    -- Legacy setting_id retained for existing user configurations. It is now
+                    -- a general streak window and also controls CF icon display duration.
                     {
                         setting_id = "cf_killstreak_reset_time",
                         type = "numeric",
                         default_value = 20,
                         range = {10, 30},
                         step = 1,
+                    },
+                    {
+                        setting_id = "cf_killstreak_max",
+                        type = "numeric",
+                        default_value = 13,
+                        range = {10, 30},
+                        step = 1,
+                    },
+                },
+            },
+            {
+                setting_id = "bf4_feed_settings",
+                type = "group",
+                sub_widgets = {
+                    {
+                        setting_id = "bf4_feed_enabled",
+                        type = "checkbox",
+                        default_value = false,
+                    },
+                    {
+                        setting_id = "bf4_feed_target",
+                        type = "dropdown",
+                        default_value = "all",
+                        options = make_localized_options(TARGET_OPTIONS),
+                    },
+                    {
+                        setting_id = "bf4_feed_duration",
+                        type = "numeric",
+                        default_value = 30,
+                        range = {10, 30},
+                        step = 1,
+                    },
+                    {
+                        setting_id = "bf4_feed_horizontal_position",
+                        type = "numeric",
+                        default_value = 50,
+                        range = {0, 100},
+                        step = 5,
+                    },
+                    {
+                        setting_id = "bf4_feed_vertical_position",
+                        type = "numeric",
+                        default_value = 0,
+                        range = {0, 100},
+                        step = 5,
+                    },
+                    {
+                        setting_id = "bf4_feed_text_scale",
+                        type = "numeric",
+                        default_value = 100,
+                        range = {50, 150},
+                        step = 5,
                     },
                 },
             },
@@ -385,18 +442,11 @@ return {
                             },
                         },
                     },
-                    -- CF 风格子分组（5 个设置；kill_icon_duration_CF 已迁移并重命名为 general_settings.cf_killstreak_reset_time）
+                    -- CF 风格子分组（仅图标视觉设置；连杀计数设置位于通用设置）
                     {
                         setting_id = "icon_settings_cf",
                         type = "group",
                         sub_widgets = {
-                            {
-                                setting_id = "cf_killstreak_max",
-                                type = "numeric",
-                                default_value = 13,
-                                range = {10, 30},
-                                step = 1,
-                            },
                             {
                                 setting_id = "kill_icon_transparency_CF",
                                 type = "numeric",
