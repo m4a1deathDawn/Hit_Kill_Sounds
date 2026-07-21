@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.4{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.4{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.4.2{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.4.2{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -13,8 +13,8 @@ return {
         ["zh-cn"] = "总开关",
     },
     killstreak_enabled = {
-        en = "Enable Killstreak Mechanism",
-        ["zh-cn"] = "启用连杀机制",
+        en = "Enable Independent Killstreak Counters",
+        ["zh-cn"] = "启用独立连杀计数器",
     },
     -- §11.B 同伴开关（2026-07-01）
     companion_hit_sound_enabled = {
@@ -43,8 +43,8 @@ return {
         ["zh-cn"] = "启用战地4风格文字击杀信息",
     },
     bf4_feed_target = {
-        en = "Text Feed Target",
-        ["zh-cn"] = "文字信息生效对象",
+        en = "BF4 Text Feed Target (BF4 text events only)",
+        ["zh-cn"] = "BF4 文字信息生效对象（仅控制 BF4 文字事件）",
     },
     bf4_feed_duration = {
         en = "Text Feed Display Duration (1.0s-3.0s)",
@@ -157,13 +157,13 @@ return {
         ["zh-cn"] = "击杀音效音量",
     },
     kill_target = {
-        en = "Kill Sound Target",
-        ["zh-cn"] = "击杀音效生效对象",
+        en = "Kill Sound Target (kill sound output only)",
+        ["zh-cn"] = "击杀音效生效对象（仅控制击杀音效）",
     },
     -- 击杀图标生效对象（2026-07-01 解耦：从 kill_target 独立，控制 BF5/CF 及后续图标风格）
     kill_icon_target = {
-        en = "Kill Icon Target",
-        ["zh-cn"] = "击杀图标生效对象",
+        en = "Kill Icon Target (kill icon output only)",
+        ["zh-cn"] = "击杀图标生效对象（仅控制击杀图标）",
     },
     kill_dot = {
         en = "Enable DoT Kill Sounds",
@@ -259,8 +259,8 @@ return {
         ["zh-cn"] = "穿越火线图标设置（需启用连杀机制）",
     },
     cf_killstreak_max = {
-        en = "Killstreak Counter Max (10-30)",
-        ["zh-cn"] = "连杀计数上限 (10-30)",
+        en = "Independent Killstreak Counter Max (10-30)",
+        ["zh-cn"] = "独立连杀计数器上限 (10-30)",
     },
     kill_icon_transparency_CF = {
         en = "CF Icon Transparency",
@@ -278,10 +278,11 @@ return {
         en = "CF Icon Horizontal Position",
         ["zh-cn"] = "CF 图标水平位置",
     },
-    -- Legacy setting_id retained; it now uses general killstreak semantics.
+    -- Legacy setting_id retained; the reset window is shared as configuration only,
+    -- while BF4, CF sound, and CF icon keep separate counter state.
     cf_killstreak_reset_time = {
-        en = "Killstreak Counter Reset Time (1.0s-3.0s)",
-        ["zh-cn"] = "连杀计数器重置时间（1.0-3.0秒）",
+        en = "Independent Counter Reset Time (1.0s-3.0s)",
+        ["zh-cn"] = "独立计数器重置时间（1.0-3.0秒）",
     },
     -- §21 BF4 文字信息事件标签与分值；显示文本不包含加号。
     bf4_feed_enemy_killed = {

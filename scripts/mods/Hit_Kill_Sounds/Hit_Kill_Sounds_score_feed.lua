@@ -131,13 +131,9 @@ local function start_tally_fade(tally)
 end
 
 local function get_tally_activity_time()
-    local generic_state = HKS.HitKillSoundsKillstreakState
-    local generic_last_kill_time = generic_state and tonumber(generic_state.last_kill_time) or 0
-
-    -- The generic state is authoritative for ordinary streak kills. The local
-    -- activity timestamp only keeps a Boss-only text batch visible because Boss
-    -- feedback intentionally does not increment the generic counter.
-    return math.max(generic_last_kill_time, ScoreFeed._last_activity_time)
+    -- BF4 tally lifetime is owned by the most recent valid BF4 text batch.
+    -- Do not let a kill accepted by another output target extend this feed.
+    return ScoreFeed._last_activity_time
 end
 
 local function event_color(event_key)
