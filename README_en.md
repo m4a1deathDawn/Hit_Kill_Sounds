@@ -2,7 +2,7 @@
 
 A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
 
-Current version: v1.4
+Current version: v1.4.2
 
 ## Features
 
@@ -23,8 +23,9 @@ Current version: v1.4
 - **SimpleAudio + SimpleAssets backend** (v1.2): Audio now plays through SimpleAudio by default, and icon textures load through SimpleAssets by default, with no external player executable required
 - **CODBO7 kill sounds** (v1.3): Normal kills randomly use three variants and headshot kills use a dedicated file; CODBO7 is available only in kill-source dropdowns
 - **Custom Mourningstar BGM** (v1.3): Optionally play six local MP3 tracks in the normal `hub` and adjust their volume independently
-- **Generic killstreak mechanism and burst-playback protection** (v1.35): Streak counting is independent from CF outputs, while SimpleAudio uses a bounded queue, frame-spread dispatch, and a multi-voice pool
+- **Generic killstreak mechanism and burst-playback protection** (v1.35): BF4 text, CF sound, and CF icon each maintain an independent streak counter, while SimpleAudio uses a bounded queue, frame-spread dispatch, and a multi-voice pool
 - **Battlefield 4-style text kill feed and independent score tally** (v1.4): Fixed-slot HUD text and cumulative score output, independent of BF5/CF sound and icon switches
+- **Independent output counters** (v1.4.2): BF4, CF sound, and CF icon use separate counters, so different filters may produce different streak numbers
 
 ## Kill Icons
 
@@ -56,10 +57,12 @@ New in v1.1! A CrossFire-themed killstreak system ported from the EBuyToDeep_Kil
 - **Dedicated boss sound**: Killing monster-tagged enemies plays `killsound_cf_boss.wav`
 - **Style switch**: Select "CrossFire Style" in the Style dropdown at the top of Kill Icon Settings
 - **Adjustable parameters**:
-  - Killstreak max count (10-30, default 13; wraps to 0 and restarts a new streak when reached)
+  - Killstreak max count (10-30, default 13; each counter wraps independently)
+  - BF4 text target (`bf4_feed_target`), CF sound target (`kill_target`), and CF icon target (`kill_icon_target`)
   - Icon transparency, size, vertical/horizontal position
   - Counter reset time (1.0s-3.0s, default 2.0s; controls both the killstreak reset window and the icon display duration)
 - **Decoupled sound & icon**: The "Enable CF Kill Sound" toggle in Kill Sound Settings is independent of icon style — supports 4 combinations: CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5
+- **Independent target semantics**: `bf4_feed_target` controls only BF4 text events, `kill_target` controls only CF/BF5 kill sounds, and `kill_icon_target` controls only CF/BF5 kill icons; `killstreak_target` has been removed and old saved values are ignored
 
 Icon assets: CrossFire killstreak icons
 
@@ -160,6 +163,15 @@ Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/Hi
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.4.2
+- **Three independent killstreak counters**: BF4 text, CF sound, and CF icon each maintain their own kill count and last-kill time, using `bf4_feed_target`, `kill_target`, and `kill_icon_target` respectively
+- **Independent sequence numbers**: When filters differ, BF4, CF sound, and CF icon may show/play different streak numbers; they naturally synchronize only when their targets match
+- **Removed `killstreak_target`**: It is no longer present in the settings UI or read at runtime; old saved values are ignored and are not synchronized to the other targets
+- **Verification status**: Code and static checks are complete; in-game verification remains pending
+
+### v1.4.1
+- **Historical note**: This version attempted to use `killstreak_target` for a shared CF sound/icon counter. In-game verification did not meet the intended behavior; v1.4.2 removes that shared-counter design and runtime setting
 
 ### v1.4
 - **Added Battlefield 4-style text kill feed**: Added an independent settings group with target filtering, 1.0-3.0 second duration, position, and scale controls; disabled by default
