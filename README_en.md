@@ -2,7 +2,7 @@
 
 A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
 
-Current version: v1.4.2
+Current version: v1.4.5
 
 ## Features
 
@@ -163,6 +163,10 @@ Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/Hi
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.4.5
+- **Servo skull companion filtering**: Servo skull laser and initial flamer direct hits reuse the companion hit-sound, kill-sound, and kill-icon toggles; subsequent burn DoT is excluded from companion filtering
+- **Chain-lightning game hit-sound mute**: Disabling the game's hit sounds now mutes the chain-lightning loop start event while preserving its stop event
 
 ### v1.4.2
 - **Three independent killstreak counters**: BF4 text, CF sound, and CF icon each maintain their own kill count and last-kill time, using `bf4_feed_target`, `kill_target`, and `kill_icon_target` respectively
