@@ -36,10 +36,18 @@ local DOT_DAMAGE_TYPES = {
     [damage_types.electrocution] = true,  -- 触电（链式闪电法杖等）—— §13 bug 修复重点
 }
 
--- §11.B 同伴 attack_type 白名单（仅 Adamant 狗，详见 §11.B.7）
+-- §11.B 同伴攻击识别：保留 Adamant 狗 attack_type，并按精确伤害配置补充 Servo skull。
 local COMPANION_ATTACK_TYPES = {
     [AttackSettings.attack_types.companion_dog] = true,
 }
+local COMPANION_DAMAGE_PROFILES = {
+    -- Servo skull 激光
+    default_companion_servo_skull_lasgun_killshot = true,
+    improved_companion_servo_skull_lasgun_killshot = true,
+    -- Servo skull 火焰初始直击（后续燃烧 tick 使用通用 burning 配置）
+    companion_servo_skull_flamer = true,
+}
+local SERVO_SKULL_FLAMER_DIRECT_DAMAGE_PROFILE = "companion_servo_skull_flamer"
 
 -- 目标类型检测函数（必须放在 CF 输出消费者之前！
 --   Lua 5.4 闭包规则：函数定义时只捕获当前可见的 upvalues。
@@ -342,6 +350,7 @@ local HIT_WWISE_PATTERNS  = {
     "play_power_sword_hit",              -- Power Sword 通用
     "play_arc_maul_hit",                 -- Power Maul P3 arc active
     "play_powermaul_1h_hit",             -- Power Maul P3
+    "play_psyker_chain_lightning_hit",   -- 链式闪电循环命中音（仅静音开始事件）
 }
 local KILL_WWISE_PATTERNS = { "play_minion_killed", "play_elite_killed", "play_special_killed", "play_monster_killed", "play_husk_killed", "play_ogryn_killed" }
 
@@ -909,8 +918,11 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         return
     end
 
-    -- §11.B 同伴攻击判定（用户 2026-07-01 决策：仅识别 Adamant 狗）
-    local is_companion_attack = attack_type and COMPANION_ATTACK_TYPES[attack_type] == true
+    -- §11.B 同伴攻击判定（保留 Adamant 狗，并精确识别 Servo skull 直接伤害）
+    local damage_profile_name = damage_profile and damage_profile.name
+    local is_servo_skull_flamer_direct = damage_profile_name == SERVO_SKULL_FLAMER_DIRECT_DAMAGE_PROFILE
+    local is_companion_attack = (attack_type and COMPANION_ATTACK_TYPES[attack_type] == true) or
+        (damage_profile_name and COMPANION_DAMAGE_PROFILES[damage_profile_name] == true)
 
     -- 只处理有效伤害
     if not damage or damage <= 0 then
@@ -931,7 +943,7 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
     -- 优先依据 damage_profile.damage_type 字段（权威，由 damage_profile 显式声明）
     -- 后备依据 damage_profile.name 关键字模糊匹配（兼容部分未显式设置 damage_type 的 buff 类伤害）
     local is_dot_damage = false
-    if damage_profile then
+    if damage_profile and not is_servo_skull_flamer_direct then
         -- 主判定：damage_type 字段查表
         local dt = damage_profile.damage_type
         if dt and DOT_DAMAGE_TYPES[dt] then
