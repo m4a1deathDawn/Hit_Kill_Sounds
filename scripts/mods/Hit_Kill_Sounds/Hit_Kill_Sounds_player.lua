@@ -2,59 +2,118 @@
 local HKS = get_mod("Hit_Kill_Sounds")
 HKS.HitKillSoundsPlayer = {}
 
-local binaries_path_handle = Mods.lua.io.popen("cd")
-local binaries_path = binaries_path_handle:read()
-binaries_path_handle:close()
-local mods_path = binaries_path:gsub("binaries", "mods")
-mods_path = mods_path:gsub("\\", "/")
-local hks_path = mods_path .. "/Hit_Kill_Sounds/"
-local player_path = hks_path .. "bin/"
-local audio_path = hks_path .. "audio/"
+local lua_io = Mods and Mods.lua and Mods.lua.io
+local player_path
+local audio_path
 
-local function file_exists(path)
-    local handle = Mods.lua.io.open(path, "rb")
-
-    if handle then
-        handle:close()
-        return true
+-- 即使 popen/read/close 或路径转换失败，也要继续加载 SimpleAudio 后端。
+local function detect_legacy_path()
+    if not lua_io or type(lua_io.popen) ~= "function" then
+        return nil
     end
 
-    return false
+    local open_ok, handle = pcall(lua_io.popen, "cd")
+    if not open_ok or not handle then
+        return nil
+    end
+
+    local read_ok, binaries_path = pcall(function()
+        return handle:read()
+    end)
+    local close_ok, closed = pcall(function()
+        return handle:close()
+    end)
+
+    if not read_ok or not close_ok or not closed or type(binaries_path) ~= "string" then
+        return nil
+    end
+
+    local convert_ok, hks_path = pcall(function()
+        local normalized_path = binaries_path:gsub("[\r\n]+$", ""):gsub("\\", "/"):gsub("/+$", "")
+        local mods_path, replacements = normalized_path:gsub("/[Bb][Ii][Nn][Aa][Rr][Ii][Ee][Ss]$", "/mods", 1)
+
+        if normalized_path == "" or replacements ~= 1 then
+            return nil
+        end
+
+        return mods_path .. "/Hit_Kill_Sounds/"
+    end)
+
+    return convert_ok and hks_path or nil
+end
+
+local hks_path = detect_legacy_path()
+if hks_path then
+    player_path = hks_path .. "bin/"
+    audio_path = hks_path .. "audio/"
+end
+
+local function file_exists(path)
+    if not lua_io or type(lua_io.open) ~= "function" or not path then
+        return false
+    end
+
+    local open_ok, handle = pcall(lua_io.open, path, "rb")
+    if not open_ok or not handle then
+        return false
+    end
+
+    local close_ok, closed = pcall(function()
+        return handle:close()
+    end)
+
+    return close_ok and not not closed
 end
 
 local function read_port_config(path)
-    local port_handle = Mods.lua.io.open(path, "rb")
-
-    if not port_handle then
+    if not lua_io or type(lua_io.open) ~= "function" or not path then
         return nil
     end
 
-    local port_json = port_handle:read("*a")
-    port_handle:close()
-
-    if not port_json or port_json == "" then
+    local open_ok, handle = pcall(lua_io.open, path, "rb")
+    if not open_ok or not handle then
         return nil
     end
 
-    local ok, config = pcall(cjson.decode, port_json)
+    local read_ok, port_json = pcall(function()
+        return handle:read("*a")
+    end)
+    local close_ok, closed = pcall(function()
+        return handle:close()
+    end)
 
-    if not ok then
+    if not read_ok or not close_ok or not closed or type(port_json) ~= "string" or port_json == "" then
+        return nil
+    end
+
+    local decode_ok, config = pcall(function()
+        return cjson.decode(port_json)
+    end)
+
+    if not decode_ok or type(config) ~= "table" then
         return nil
     end
 
     return config
 end
 
--- legacy HTTP 播放器。bin 不存在时禁用，避免 N 网发布包加载失败。
-local bat_path = player_path .. "StartHitKillSoundsPlayer.bat"
-local port_config = read_port_config(player_path .. "port.json")
-local legacy_available = file_exists(bat_path) and port_config ~= nil
+-- legacy HTTP 播放器。路径探测或 bin 不可用时禁用，SimpleAudio 仍可正常加载。
+local bat_path = player_path and player_path .. "StartHitKillSoundsPlayer.bat"
+local port_config = player_path and read_port_config(player_path .. "port.json")
+local legacy_available = bat_path ~= nil and file_exists(bat_path) and port_config ~= nil
 local host = nil
 local player_started = false
 
 if legacy_available then
-    local port = port_config and port_config.port or 42213
+    local port = tonumber(port_config.port) or 42213
     host = string.format("http://localhost:%s/", port)
+end
+
+local function disable_legacy()
+    legacy_available = false
+    host = nil
+    HKS.HitKillSoundsPlayer.legacy_available = false
+    HKS.HitKillSoundsPlayer.host = nil
 end
 
 local function ensure_player_started()
@@ -66,11 +125,13 @@ local function ensure_player_started()
         return true
     end
 
-    local ok = pcall(function()
-        Mods.lua.io.popen('"' .. bat_path .. '"'):close()
+    local ok, started = pcall(function()
+        local handle = lua_io.popen('"' .. bat_path .. '"')
+        return handle and handle:close()
     end)
 
-    if not ok then
+    if not ok or not started then
+        disable_legacy()
         return false
     end
 

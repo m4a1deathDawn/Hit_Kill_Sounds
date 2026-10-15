@@ -334,7 +334,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
                 end
             else
                 -- 离场动画：向左滑出并淡出
-                local progress = leave_elapsed / leave_duration
+                local progress = math.max(0, math.min(1, leave_elapsed / leave_duration))
                 progress = 1 - (1 - progress) ^ 3
                 local leave_offset = LEAVE_OFFSET * progress
                 slot.current_x = slot.target_x - leave_offset
@@ -361,7 +361,8 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
             end
 
             -- 平滑移动到target_x (使用正确的插值公式)
-            slot.current_x = slot.current_x + (slot.target_x - slot.current_x) * dt * 10
+            local move_alpha = math.max(0, math.min(1, dt * 10))
+            slot.current_x = slot.current_x + (slot.target_x - slot.current_x) * move_alpha
 
             icon_root.position[1] = slot.current_x
             icon_root.position[2] = y_pos
@@ -370,7 +371,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
             -- 计算透明度
             local alpha = 255
             if elapsed < enter_duration then
-                local progress = elapsed / enter_duration
+                local progress = math.max(0, math.min(1, elapsed / enter_duration))
                 progress = 1 - (1 - progress) ^ 3
                 alpha = math.floor(255 * progress)
             elseif elapsed > display_duration then
@@ -381,7 +382,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
                     slot.leaving_start_time = now_time
                     alpha = 0
                 else
-                    local progress = fade_elapsed / fade_duration
+                    local progress = math.max(0, math.min(1, fade_elapsed / fade_duration))
                     progress = 1 - (1 - progress) ^ 3
                     alpha = math.floor(255 * (1 - progress))
                 end
@@ -390,7 +391,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
             -- 计算scale (入场动画 1.8 -> size_scale, ease-out)
             local scale = size_scale
             if elapsed < enter_duration then
-                local progress = elapsed / enter_duration
+                local progress = math.max(0, math.min(1, elapsed / enter_duration))
                 progress = 1 - (1 - progress) ^ 3
                 scale = 1.8 - (1.8 - size_scale) * progress
             end
@@ -430,7 +431,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
                 local circle_alpha = 255
 
                 if circle_elapsed > 0 and circle_elapsed < circle_duration then
-                    local progress = circle_elapsed / circle_duration
+                    local progress = math.max(0, math.min(1, circle_elapsed / circle_duration))
                     circle_scale = 1 + 3 * progress
                     circle_alpha = math.floor(255 * (1 - progress))
                 elseif circle_elapsed >= circle_duration then
