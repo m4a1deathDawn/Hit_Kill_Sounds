@@ -21,19 +21,80 @@ local AUDIO_PRIORITY = AudioBackend and AudioBackend.PRIORITY or {
 -- 引入AttackSettings用于攻击结果检测
 local AttackSettings = require("scripts/settings/damage/attack_settings")
 local DamageSettings = require("scripts/settings/damage/damage_settings")
+local Breed = require("scripts/utilities/breed")
 local damage_types = DamageSettings.damage_types
 
--- DoT（Damage over Time）damage_type 集合
--- 基于 D:\暗潮mod\scripts\settings\damage\damage_settings.lua line 5 中
--- damage_types 枚举的实证分析；任何在此集合中的 damage_type 都被视为持续伤害
+-- 只保留有明确持续伤害语义的通用 damage_type。electrocution 必须通过
+-- damage_profile.name 精确判定，不能把所有电击伤害都当成 DoT。
 local DOT_DAMAGE_TYPES = {
-    [damage_types.bleeding]      = true,  -- 出血（狂热者血咒等）
-    [damage_types.burning]       = true,  -- 燃烧（火焰喷射器、燃烧弹）
-    [damage_types.toxin]         = true,  -- 中毒（毒药 stat）
-    [damage_types.corruption]    = true,  -- 腐化（永久伤害）
-    [damage_types.grimoire]      = true,  -- 死灵之书 tick
-    [damage_types.warpfire]      = true,  -- 灵能火焰
-    [damage_types.electrocution] = true,  -- 触电（链式闪电法杖等）—— §13 bug 修复重点
+    [damage_types.bleeding] = true,
+    [damage_types.burning] = true,
+    [damage_types.toxin] = true,
+    [damage_types.corruption] = true,
+    [damage_types.grimoire] = true,
+    [damage_types.warpfire] = true,
+}
+
+local ELECTROCUTION_DOT_PROFILES = {
+    shock_grenade_stun_interval = true,
+    default_chain_lighting_interval = true,
+    psyker_protectorate_spread_chain_lightning_interval = true,
+    psyker_heavy_swings_shock = true,
+    psyker_stun = true,
+    shockmaul_stun_interval_damage = true,
+    powermaul_p2_stun_interval = true,
+    powermaul_p2_stun_interval_basic = true,
+    cryptic_discharge_shock_damage = true,
+    cryptic_arc_grenade_shock_damage = true,
+    cryptic_arc_shock_damage = true,
+    cryptic_discharge_weapon_shock = true,
+    broker_toxin_stacks_stun_interval = true,
+}
+
+-- 通用 tick 的运行时 damage_type 未必写回 profile，按 1.13.2 源码补充精确名称。
+local GENERIC_DOT_PROFILES = {
+    bleeding = true,
+    burning = true,
+    phosphor_burning = true,
+    liquid_area_fire_burning = true,
+    liquid_area_fire_burning_barrel = true,
+    flame_grenade_liquid_area_fire_burning = true,
+    grenadier_liquid_fire_burning = true,
+    cultist_flamer_liquid_fire_burning = true,
+    renegade_flamer_liquid_fire_burning = true,
+    horde_flame_impact = true,
+    spillway_wizard_dance_floor_burn = true,
+    toxin_variant_1 = true,
+    toxin_variant_2 = true,
+    toxin_variant_3 = true,
+    horde_mode_self_propagating_toxin = true,
+    corruptor_damage_tick = true,
+    corruptor_liquid_corruption = true,
+    daemonhost_corruption_aura = true,
+    mutator_green_corruption = true,
+    mutator_corruption = true,
+    toxic_gas = true,
+    toxic_gas_mutator = true,
+    cultist_grenadier_gas = true,
+}
+
+local NON_DOT_DAMAGE_PROFILES = {
+    default_chain_lighting_attack = true,
+    psyker_protectorate_channel_chain_lightning_activated = true,
+    psyker_shield_stagger = true,
+    chain_lightning_killing_blow = true,
+    default_flamer_assault = true,
+    default_flamer_assault_burst = true,
+    default_warpfire_assault = true,
+    default_warpfire_assault_burst = true,
+    shockmaul_shield_stun_interval_damage = true,
+}
+
+local VALID_HIT_RESULTS = {
+    [AttackSettings.attack_results.damaged] = true,
+    [AttackSettings.attack_results.toughness_absorbed] = true,
+    [AttackSettings.attack_results.toughness_absorbed_melee] = true,
+    [AttackSettings.attack_results.toughness_broken] = true,
 }
 
 -- §11.B 同伴攻击识别：保留 Adamant 狗 attack_type，并按精确伤害配置补充 Servo skull。
@@ -48,6 +109,7 @@ local COMPANION_DAMAGE_PROFILES = {
     companion_servo_skull_flamer = true,
 }
 local SERVO_SKULL_FLAMER_DIRECT_DAMAGE_PROFILE = "companion_servo_skull_flamer"
+NON_DOT_DAMAGE_PROFILES[SERVO_SKULL_FLAMER_DIRECT_DAMAGE_PROFILE] = true
 
 -- 目标类型检测函数（必须放在 CF 输出消费者之前！
 --   Lua 5.4 闭包规则：函数定义时只捕获当前可见的 upvalues。
@@ -75,6 +137,38 @@ local function is_target_valid(breed_or_nil, target_setting)
     return true
 end
 
+local function is_kill_feedback_target_excluded(breed_or_nil)
+    if not breed_or_nil then
+        return true
+    end
+
+    return Breed.is_player(breed_or_nil) or Breed.is_prop(breed_or_nil)
+end
+
+local function is_dot_damage_profile(damage_profile, attack_type)
+    if not damage_profile then
+        return false
+    end
+
+    local profile_name = damage_profile.name
+
+    if NON_DOT_DAMAGE_PROFILES[profile_name] then
+        return false
+    end
+
+    if profile_name == "primer_stun" then
+        return attack_type == AttackSettings.attack_types.buff or attack_type == "buff"
+    end
+
+    if ELECTROCUTION_DOT_PROFILES[profile_name] or GENERIC_DOT_PROFILES[profile_name] then
+        return true
+    end
+
+    local damage_type = damage_profile.damage_type
+
+    return damage_type ~= nil and DOT_DAMAGE_TYPES[damage_type] == true
+end
+
 -- §13.B CF 资源探测
 -- 默认值基于 2026-07-01 实际资源数，作为 scan 失败兜底：
 --   9 个普通音效（killsound_cf_01..09.wav）+ 1 个 boss 音（killsound_cf_boss.wav）
@@ -99,12 +193,14 @@ local function _file_exists(path)
         return false
     end
 
-    local handle = lua_io.open(path, "rb")
-    if not handle then
+    local open_ok, handle = pcall(lua_io.open, path, "rb")
+    if not open_ok or not handle then
         return false
     end
 
-    handle:close()
+    pcall(function()
+        handle:close()
+    end)
     return true
 end
 
@@ -120,18 +216,27 @@ end
 
 local function _scan_cf_assets()
     -- 扫描音效：cwd = binaries 目录，audio 在 ../mods/Hit_Kill_Sounds/audio/
-    local handle = Mods.lua.io.popen and Mods.lua.io.popen('dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\KillSounds\\cf\\killsound_cf_*.wav" 2>nul')
-    if handle then
-        for line in handle:lines() do
-            -- 跳过 boss 文件
-            if not line:match("^killsound_cf_boss%.wav$") then
-                local num = tonumber(line:match("^killsound_cf_(%d+)%.wav$"))
-                if num and num > CF_KILL_SOUNDS_MAX then
-                    CF_KILL_SOUNDS_MAX = num  -- 只在 scan 找到更多时 override
+    local lua_io = Mods and Mods.lua and Mods.lua.io
+    local scan_ok, handle = pcall(function()
+        return lua_io and lua_io.popen and lua_io.popen(
+            'dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\KillSounds\\cf\\killsound_cf_*.wav" 2>nul'
+        )
+    end)
+    if scan_ok and handle then
+        pcall(function()
+            for line in handle:lines() do
+                -- 跳过 boss 文件；扫描失败保留已确认的数量和默认值。
+                if not line:match("^killsound_cf_boss%.wav$") then
+                    local num = tonumber(line:match("^killsound_cf_(%d+)%.wav$"))
+                    if num and num > CF_KILL_SOUNDS_MAX then
+                        CF_KILL_SOUNDS_MAX = num
+                    end
                 end
             end
-        end
-        handle:close()
+        end)
+        pcall(function()
+            handle:close()
+        end)
     end
 
     -- boss 文件存在性
@@ -351,8 +456,37 @@ local HIT_WWISE_PATTERNS  = {
     "play_arc_maul_hit",                 -- Power Maul P3 arc active
     "play_powermaul_1h_hit",             -- Power Maul P3
     "play_psyker_chain_lightning_hit",   -- 链式闪电循环命中音（仅静音开始事件）
+    "play_ogryn_powermaul_1h_hit_sparks",
+    "play_ogryn_powermaul_1h_spark",
+    "play_arc_maul_1h_electric_sparks",
+    "play_power_sword_1h_p2_hit",
+    "play_power_sword_2h_hit",
+    "play_melee_hit_forcesword_hit_damage",
+    "play_melee_hits_forcesword_special_cleave",
+    "play_combat_weapon_chainsword_hit_impact",
+    "play_combat_weapon_chainsword_hit_res",
+    "play_weapon_addon_hit_thunderhammer_sparks",
+    "play_powermaul_1h_stuck_impact",
+    "play_powermaul_1h_stuck_impact_died",
+    "play_psyker_lightning_bolt_impact_death",
 }
 local KILL_WWISE_PATTERNS = { "play_minion_killed", "play_elite_killed", "play_special_killed", "play_monster_killed", "play_husk_killed", "play_ogryn_killed" }
+-- 新增事件按 basename 精确比较；原有族模式继续匹配各自的 play 事件。
+local HIT_WWISE_EXACT_EVENTS = {
+    ["play_ogryn_powermaul_1h_hit_sparks"] = true,
+    ["play_ogryn_powermaul_1h_spark"] = true,
+    ["play_arc_maul_1h_electric_sparks"] = true,
+    ["play_power_sword_1h_p2_hit"] = true,
+    ["play_power_sword_2h_hit"] = true,
+    ["play_melee_hit_forcesword_hit_damage"] = true,
+    ["play_melee_hits_forcesword_special_cleave"] = true,
+    ["play_combat_weapon_chainsword_hit_impact"] = true,
+    ["play_combat_weapon_chainsword_hit_res"] = true,
+    ["play_weapon_addon_hit_thunderhammer_sparks"] = true,
+    ["play_powermaul_1h_stuck_impact"] = true,
+    ["play_powermaul_1h_stuck_impact_died"] = true,
+    ["play_psyker_lightning_bolt_impact_death"] = true,
+}
 
 -- 静音模式表（按 setting 状态填充；event_name:match(pattern) 子串匹配）
 local silenced_patterns = {}
@@ -373,8 +507,14 @@ end
 
 local function is_event_silenced(event_name)
     if type(event_name) ~= "string" then return false end
+    local event_basename = event_name:match("([^/]+)$")
+    if not event_basename or not event_basename:match("^play_") then return false end
     for pattern in pairs(silenced_patterns) do
-        if event_name:match(pattern) then return true end
+        if HIT_WWISE_EXACT_EVENTS[pattern] then
+            if event_basename == pattern then return true end
+        elseif event_name:match(pattern) then
+            return true
+        end
     end
     return false
 end
@@ -920,12 +1060,11 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
     -- §11.B 同伴攻击判定（保留 Adamant 狗，并精确识别 Servo skull 直接伤害）
     local damage_profile_name = damage_profile and damage_profile.name
-    local is_servo_skull_flamer_direct = damage_profile_name == SERVO_SKULL_FLAMER_DIRECT_DAMAGE_PROFILE
     local is_companion_attack = (attack_type and COMPANION_ATTACK_TYPES[attack_type] == true) or
         (damage_profile_name and COMPANION_DAMAGE_PROFILES[damage_profile_name] == true)
 
-    -- 只处理有效伤害
-    if not damage or damage <= 0 then
+    -- damage == 0 仍可能是完全由韧性吸收的有效命中；只有 nil 不能判定。
+    if damage == nil then
         return
     end
 
@@ -939,26 +1078,9 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         return
     end
 
-    -- DoT伤害类型检测
-    -- 优先依据 damage_profile.damage_type 字段（权威，由 damage_profile 显式声明）
-    -- 后备依据 damage_profile.name 关键字模糊匹配（兼容部分未显式设置 damage_type 的 buff 类伤害）
-    local is_dot_damage = false
-    if damage_profile and not is_servo_skull_flamer_direct then
-        -- 主判定：damage_type 字段查表
-        local dt = damage_profile.damage_type
-        if dt and DOT_DAMAGE_TYPES[dt] then
-            is_dot_damage = true
-        elseif damage_profile.name then
-            -- 后备判定：profile name 关键字模糊匹配
-            local profile_name = damage_profile.name:lower()
-            if profile_name:find("bleed") or profile_name:find("burn") or profile_name:find("fire") or
-               profile_name:find("toxin") or profile_name:find("corruption") or profile_name:find("grimoire") or
-               profile_name:find("electrocution") or profile_name:find("warpfire") or
-               profile_name:find("chain_lighting") or profile_name:find("chain_lightning") then
-                is_dot_damage = true
-            end
-        end
-    end
+    -- AttackReportManager 不传运行时 damage_type；电击来源依赖 profile name，
+    -- primer_stun 依赖 attack_type，通用 DoT 使用精确 profile 或明确的 damage_type。
+    local is_dot_damage = is_dot_damage_profile(damage_profile, attack_type)
 
     -- 获取breed信息
     local unit_data_extension = ScriptUnit.has_extension(attacked_unit, "unit_data_system")
@@ -966,6 +1088,16 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
     -- 如果是击杀
     if attack_result == AttackSettings.attack_results.died then
+        -- 零伤害报告可以是韧性命中，但不能产生击杀反馈。
+        if damage <= 0 then
+            return
+        end
+
+        -- 过滤玩家、自伤/友伤和普通 prop；living_prop 保持原有行为。
+        if is_kill_feedback_target_excluded(breed_or_nil) then
+            return
+        end
+
         local is_kill_headshot = hit_weakspot == true
 
         -- §23：三个输出各自使用自己的目标设置和连杀计数器。
@@ -1079,14 +1211,8 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         return
     end
 
-    -- 检查是否有效命中结果
-    local valid_results = {
-        [AttackSettings.attack_results.damaged] = true,
-        [AttackSettings.attack_results.toughness_absorbed] = true,
-        [AttackSettings.attack_results.toughness_absorbed_melee] = true,
-        [AttackSettings.attack_results.toughness_broken] = true,
-    }
-    if not valid_results[attack_result] then
+    -- 普通命中只接受明确的有效结果；nil、blocked、dodged 和未知结果均拒绝。
+    if not VALID_HIT_RESULTS[attack_result] then
         return
     end
 

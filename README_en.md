@@ -2,7 +2,7 @@
 
 A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
 
-Current version: v1.4.5
+Current version: v1.4.7
 
 ## Features
 
@@ -163,6 +163,10 @@ Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/Hi
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.4.7
+- **1.13.2 compatibility fixes**: Added missing native hit-mute events, preserved zero-damage toughness hits, and changed electrocution DoT handling to exact damage profiles
+- **Kill-target and runtime stability fixes**: Filtered player/ordinary prop kill feedback, protected legacy player path detection, and clamped low-FPS HUD interpolation
 
 ### v1.4.5
 - **Servo skull companion filtering**: Servo skull laser and initial flamer direct hits reuse the companion hit-sound, kill-sound, and kill-icon toggles; subsequent burn DoT is excluded from companion filtering

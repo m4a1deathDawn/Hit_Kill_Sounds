@@ -274,7 +274,7 @@ local function update_entries(dt, current_time)
         if age >= duration then
             table.remove(ScoreFeed._entries, index)
         else
-            local move_alpha = math.min(dt * 12, 1)
+            local move_alpha = clamp(dt * 12, 0, 1)
 
             entry.reveal_elapsed = (entry.reveal_elapsed or 0) + dt
             entry.current_y = entry.current_y + (entry.target_y - entry.current_y) * move_alpha
