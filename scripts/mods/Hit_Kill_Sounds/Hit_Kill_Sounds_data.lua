@@ -242,6 +242,11 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
+                    {
+                        setting_id = "kill_melee_sound_enabled",
+                        type = "checkbox",
+                        default_value = true,
+                    },
                     -- §13 CF 击杀音效独立开关（2026-07-01 解耦）
                     -- 启用后使用 killsound_cf_01..09 顺序播放（连杀索引），替代 BF5 随机音效
                     -- 独立于 kill_icon_style：可单独开 CF 音 + BF5 图，或 BF5 音 + CF 图

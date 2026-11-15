@@ -206,12 +206,12 @@ end
 
 -- §21/§23 BF4 文字击杀信息使用自己的目标和有效事件状态。
 -- 这里不能读取 CF 音效、CF 图标、BF5 音效或 BF5 图标开关。
-local function add_bf4_score_feed(breed_or_nil, is_headshot, bf4_feed_eligible)
+local function add_bf4_score_feed(breed_or_nil, is_headshot, bf4_feed_eligible, bf4_next_count)
     if not bf4_feed_eligible or not ScoreFeed then
         return false
     end
 
-    return ScoreFeed.add_kill(breed_or_nil, is_headshot) == true
+    return ScoreFeed.add_kill(breed_or_nil, is_headshot, bf4_next_count) == true
 end
 
 local function _scan_cf_assets()
@@ -294,6 +294,10 @@ end
 local cf_icon_state = {
     current_icon = nil,
     icon_show_until = 0,
+    inherited_streak_count = nil,
+    last_event_time = 0,
+    animation_kind = "first",
+    is_headshot = false,
 }
 
 local function is_killstreak_enabled()
@@ -309,6 +313,10 @@ end
 local function clear_cf_icon_state()
     cf_icon_state.current_icon = nil
     cf_icon_state.icon_show_until = 0
+    cf_icon_state.inherited_streak_count = nil
+    cf_icon_state.last_event_time = 0
+    cf_icon_state.animation_kind = "first"
+    cf_icon_state.is_headshot = false
 end
 
 local function accept_counter(counter, now, eligible)
@@ -319,11 +327,11 @@ local function accept_counter(counter, now, eligible)
     return counter:accept(now, eligible)
 end
 
-local function queue_sound(path, track_id, volume, priority, sound_kind)
+local function queue_sound(path, track_id, volume, priority, sound_kind, replace_group)
     local backend = HKS.HitKillSoundsAudioBackend
 
     if backend and backend.enqueue then
-        return backend.enqueue(path, track_id, volume, priority, sound_kind) == true
+        return backend.enqueue(path, track_id, volume, priority, sound_kind, replace_group) == true
     end
 
     return false
@@ -359,7 +367,8 @@ local function _cf_play_kill_sound(sound_streak_count, is_headshot)
     local track = get_kill_track(is_headshot, use_normal_sound)
     local sound_kind = is_headshot and "cf_kill_headshot" or "cf_kill"
 
-    queue_sound(sound_path, track, volume, AUDIO_PRIORITY.CF_KILL, sound_kind)
+    local replace_group = sound_streak_count >= 2 and "cf_numeric" or nil
+    queue_sound(sound_path, track, volume, AUDIO_PRIORITY.CF_KILL, sound_kind, replace_group)
 end
 
 local function _cf_play_headshot_special()
@@ -410,19 +419,24 @@ local function _cf_on_icon_kill(is_headshot, icon_streak_count, now)
         cf_icon_state.current_icon = cf_icon_tex[icon_idx]
     end
 
+    cf_icon_state.inherited_streak_count = icon_streak_count
+    cf_icon_state.last_event_time = now
+    cf_icon_state.animation_kind = icon_streak_count == 1 and "first" or "upgrade"
+    cf_icon_state.is_headshot = is_headshot == true
     cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
 end
 
 -- §13.C.3 Boss 击杀（不递增通用连杀计数器，但受连杀开关保护）
-local function _cf_on_boss_kill(is_headshot, cf_sound_active, cf_icon_active, now)
+local function _cf_on_boss_kill(is_headshot, cf_sound_active, cf_icon_active, now, inherited_streak_count)
     if not (cf_sound_active or cf_icon_active) then return end
 
     if cf_icon_active then
-        if is_headshot and cf_icon_tex["headshot_gold"] then
-            cf_icon_state.current_icon = cf_icon_tex["headshot_gold"]
-        else
-            cf_icon_state.current_icon = cf_icon_tex[1]
-        end
+        local icon_idx = math.min(math.max(tonumber(inherited_streak_count) or 1, 1), CF_KILL_ICONS_MAX)
+        cf_icon_state.current_icon = cf_icon_tex[icon_idx] or cf_icon_tex[1]
+        cf_icon_state.inherited_streak_count = inherited_streak_count
+        cf_icon_state.last_event_time = now
+        cf_icon_state.animation_kind = inherited_streak_count and inherited_streak_count > 0 and "upgrade" or "first"
+        cf_icon_state.is_headshot = is_headshot == true
         cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
     end
 
@@ -1063,8 +1077,11 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
     local is_companion_attack = (attack_type and COMPANION_ATTACK_TYPES[attack_type] == true) or
         (damage_profile_name and COMPANION_DAMAGE_PROFILES[damage_profile_name] == true)
 
-    -- damage == 0 仍可能是完全由韧性吸收的有效命中；只有 nil 不能判定。
-    if damage == nil then
+    -- Push/stagger and other non-damaging reports can still use a valid hit
+    -- result.  They must not produce a Mod hit sound; only positive damage is
+    -- a damage hit for this feedback path.
+    local numeric_damage = tonumber(damage)
+    if not numeric_damage or numeric_damage <= 0 then
         return
     end
 
@@ -1121,6 +1138,7 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         -- §11.B 同伴击杀分流（默认 ON 保持老用户行为兼容）
         local companion_kill_sound_allowed = not (is_companion_attack and not HKS:get("companion_kill_sound_enabled"))
         local companion_kill_icon_allowed  = not (is_companion_attack and not HKS:get("companion_kill_icon_enabled"))
+        local melee_kill_sound_allowed = attack_type ~= "melee" or HKS:get("kill_melee_sound_enabled") ~= false
 
         -- 所有计数资格都在击杀事件入口一次性确定。音频队列和 HUD 只消费
         -- 本次 accept() 返回的序号，不再从其他输出或共享状态重新读取计数。
@@ -1132,7 +1150,7 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         local cf_icon_on = killstreak_enabled and HKS:get("kill_icon_style") == "CF" and HKS:get("kill_icon_enabled")
 
         local cf_sound_active = cf_sound_on and kill_sound_target_valid and
-            dot_sound_allowed and companion_kill_sound_allowed
+            dot_sound_allowed and companion_kill_sound_allowed and melee_kill_sound_allowed
         local cf_icon_active = cf_icon_on and kill_icon_target_valid and
             dot_icon_allowed and companion_kill_icon_allowed
 
@@ -1145,18 +1163,29 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
             clear_cf_icon_state()
         end
 
-        -- BF4 只由自己的有效文字事件刷新活动时间，并只推进自己的计数器。
+        -- BF4 uses a pure preview to build the complete batch.  The counter is
+        -- accepted only after the batch has been inserted successfully.
+        local bf4_eligible = killstreak_enabled and ScoreFeed and ScoreFeed.is_enabled and
+            ScoreFeed.is_enabled() and bf4_feed_target_valid
+        local bf4_next_count = bf4_eligible and bf4_feed_counter and
+            bf4_feed_counter.preview_next and bf4_feed_counter:preview_next(now)
         local bf4_event_added = add_bf4_score_feed(
             breed_or_nil,
             is_kill_headshot,
-            killstreak_enabled and ScoreFeed and ScoreFeed.is_enabled and
-                ScoreFeed.is_enabled() and bf4_feed_target_valid
+            bf4_eligible,
+            bf4_next_count
         )
         if bf4_event_added then
             accept_counter(bf4_feed_counter, now, true)
         end
 
         -- Boss 仍可触发各自的专属输出，但不得修改普通 CF 音效/图标计数器。
+        local ordinary_icon_streak_count = nil
+        if is_boss and cf_icon_counter and cf_icon_counter.get_count and
+            not cf_icon_counter:is_expired(now) then
+            ordinary_icon_streak_count = cf_icon_counter:get_count()
+        end
+
         local sound_streak_count = accept_counter(
             cf_sound_counter,
             now,
@@ -1169,7 +1198,13 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         )
 
         if is_boss then
-            _cf_on_boss_kill(is_kill_headshot, cf_sound_active, cf_icon_active, now)
+            _cf_on_boss_kill(
+                is_kill_headshot,
+                cf_sound_active,
+                cf_icon_active,
+                now,
+                ordinary_icon_streak_count
+            )
         else
             if sound_streak_count then
                 _cf_on_sound_kill(is_kill_headshot, sound_streak_count)
@@ -1181,7 +1216,7 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
         -- BF5 音效：仅当 CF 音效未激活时（叠加 kill_sound_target_valid）
         if not cf_sound_active and kill_sound_target_valid and dot_sound_allowed and
-            companion_kill_sound_allowed and HKS:get("kill_sound_enabled") then
+            companion_kill_sound_allowed and melee_kill_sound_allowed and HKS:get("kill_sound_enabled") then
             play_kill_sound(is_kill_headshot)
         end
 

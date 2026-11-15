@@ -185,6 +185,7 @@ local all_counter_reset_settings = {
 local sound_counter_reset_settings = {
     kill_target = true,
     kill_sound_enabled = true,
+    kill_melee_sound_enabled = true,
     cf_kill_sound_enabled = true,
     kill_dot = true,
     companion_kill_sound_enabled = true,

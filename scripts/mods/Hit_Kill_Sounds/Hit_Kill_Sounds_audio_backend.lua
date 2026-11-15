@@ -224,6 +224,30 @@ local function remove_pending_track(track_id)
     end
 end
 
+local function remove_pending_replace_group(replace_group)
+    if not replace_group then
+        return
+    end
+
+    for i = #pending_queue, 1, -1 do
+        if pending_queue[i].replace_group == replace_group then
+            table.remove(pending_queue, i)
+        end
+    end
+end
+
+local function stop_active_replace_group(replace_group)
+    if not replace_group then
+        return
+    end
+
+    for i = #active_voices, 1, -1 do
+        if active_voices[i].replace_group == replace_group then
+            stop_active_voice(i)
+        end
+    end
+end
+
 local function reset_scheduler_state()
     last_dispatch_time = nil
     fallback_clock = 0
@@ -395,6 +419,7 @@ local function add_active_voice(request, play_id, started_at)
         started_at = started_at,
         path = request.path,
         sound_kind = request.sound_kind,
+        replace_group = request.replace_group,
     }
 
     table.insert(active_voices, voice)
@@ -421,6 +446,8 @@ local function start_simple_voice(request, now)
         return false, room_error
     end
 
+    stop_active_replace_group(request.replace_group)
+
     local ok, play_id = pcall(function()
         return SimpleAudio.play_file(request.path, {
             audio_type = "sfx",
@@ -443,6 +470,8 @@ local function dispatch_legacy(request)
     if not legacy_available or not legacy_play_file then
         return false
     end
+
+    stop_active_replace_group(request.replace_group)
 
     log_once("legacy", "[Hit_Kill_Sounds] 音频后端：legacy HTTP player")
     log_legacy_diagnostic_once()
@@ -504,7 +533,7 @@ AudioBackend.needs_legacy_player = function()
     return legacy_available and not using_simple_audio
 end
 
-AudioBackend.enqueue = function(path, track_id, volume, priority, sound_kind)
+AudioBackend.enqueue = function(path, track_id, volume, priority, sound_kind, replace_group)
     if HKS:get("enabled") == false or type(path) ~= "string" or path == "" then
         return false
     end
@@ -532,6 +561,7 @@ AudioBackend.enqueue = function(path, track_id, volume, priority, sound_kind)
         volume = volume,
         priority = priority,
         sound_kind = sound_kind,
+        replace_group = replace_group,
         created_at = current_main_time(),
     }
 
@@ -550,6 +580,8 @@ AudioBackend.enqueue = function(path, track_id, volume, priority, sound_kind)
         statistics.dropped_queue_full = statistics.dropped_queue_full + 1
     end
 
+    -- Replace only once the new request has passed validation and capacity admission.
+    remove_pending_replace_group(replace_group)
     table.insert(pending_queue, request)
     statistics.queued = statistics.queued + 1
     update_peak_counts()
