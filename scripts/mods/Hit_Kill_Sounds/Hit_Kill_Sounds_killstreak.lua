@@ -39,6 +39,23 @@ function KillstreakCounter:is_expired(now)
     return current_time - self.last_kill_time >= get_reset_time()
 end
 
+-- Return the next sequence number without changing counter state.  Consumers use
+-- this to build an atomic display batch before accepting a successful event.
+function KillstreakCounter:preview_next(now)
+    local current_time = tonumber(now) or 0
+    local count = self.kills_counter
+
+    if self:is_expired(current_time) then
+        count = 0
+    end
+
+    if count >= get_max_count() then
+        count = 0
+    end
+
+    return count + 1
+end
+
 function KillstreakCounter:accept(now, eligible)
     if not eligible then
         return nil

@@ -14,7 +14,7 @@ local MAX_EVENT_WIDTH = 520
 local MAX_SCORE_WIDTH = 120
 local INITIAL_LINE_HEIGHT = ScoreFeed and ScoreFeed.get_line_height and ScoreFeed.get_line_height() or 34
 local HEADSHOT_EVENT_FONT_SCALE = 0.9
-local TEXT_GAP = 12
+local TEXT_GAP = 8
 local BOTTOM_MARGIN = 90
 local TOP_MARGIN = 90
 local TALLY_OFFSET_X = 95
@@ -235,7 +235,8 @@ function HudHitKillScoreFeed:_update_entry_widget(widget, entry, base_x, base_y,
 
     score_style.text_color = entry.color
     score_style.default_text_color = entry.color
-    score_style.size[1] = math.max(MAX_SCORE_WIDTH, (score_width or 0) + 16)
+    local score_pass_width = math.max(1, (score_width or 0) + 16)
+    score_style.size[1] = score_pass_width
     score_style.size[2] = line_height
     score_style.offset[1] = base_x + TEXT_GAP
     score_style.offset[2] = base_y + entry.current_y

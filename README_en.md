@@ -2,7 +2,7 @@
 
 A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
 
-Current version: v1.4.7
+Current version: v1.5.0
 
 ## Features
 
@@ -26,6 +26,7 @@ Current version: v1.4.7
 - **Generic killstreak mechanism and burst-playback protection** (v1.35): BF4 text, CF sound, and CF icon each maintain an independent streak counter, while SimpleAudio uses a bounded queue, frame-spread dispatch, and a multi-voice pool
 - **Battlefield 4-style text kill feed and independent score tally** (v1.4): Fixed-slot HUD text and cumulative score output, independent of BF5/CF sound and icon switches
 - **Independent output counters** (v1.4.2): BF4, CF sound, and CF icon use separate counters, so different filters may produce different streak numbers
+- **v1.5 BFV/CF/BF4 update**: Added bounded BFV 10+2 icon lifecycle handling and time-based animation, valid CF streak inheritance/fade and numeric announcement replacement, BF4 multikill scoring, an independent cumulative-total display, and non-overlapping feed layout, plus an independent melee kill-sound switch.
 
 ## Kill Icons
 
@@ -163,6 +164,15 @@ Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/Hi
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.5.0
+- **BFV lifecycle and queue fixes**: The tenth main icon is retained and the eleventh evicts the oldest; bounded leaving copies, symmetric spacing, scale-aware layout, entry/ring effects, natural fade, and overflow eviction are time-driven.
+- **CF/O01 update**: Fixed fade-out at the default window and constrained the HUD using actual size and animation expansion; Boss kills display only an unexpired ordinary CF streak without advancing or extending its counter.
+- **CF announcement replacement**: Only ordinary numeric streak announcements are replaced; first-kill special audio, Boss audio, hit audio, and BGM remain untouched, with existing queue and voice limits preserved.
+- **BF4 N03/S09-S11**: Added independent-sequence multikill text and score bonuses, atomic batch submission, whole-batch capacity eviction, a separate cumulative-total display, non-overlapping text layout, staggered rows, and time-stable total-score animation.
+- **N05**: Added the enabled-by-default `kill_melee_sound_enabled` switch for Mod-owned BFV/CF melee kill sounds only; melee hit sounds, icons, BF4 text/score, and native game sounds remain independent.
+- **Non-damaging hit fix**: Valid push/stagger reports with `damage <= 0` no longer play Mod hit sounds; hits with positive damage retain the existing sound behavior.
+- **Verification status**: Static checks and isolated regression coverage were updated; in-game layout, audio, and multiplayer/RPC verification remain pending.
 
 ### v1.4.7
 - **1.13.2 compatibility fixes**: Added missing native hit-mute events, preserved zero-damage toughness hits, and changed electrocution DoT handling to exact damage profiles
