@@ -1,3 +1,4 @@
+-- luacheck: globals get_mod table
 local HKS = get_mod("Hit_Kill_Sounds")
 
 local function stop_hit_kill_audio()
@@ -77,21 +78,32 @@ HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_scor
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_events")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_bgm")
 
+local HUD_VISIBILITY_GROUPS = {
+    "alive",
+    "player_in_danger_zone",
+    "communication_wheel",
+    "emote_wheel",
+    "tactical_overlay",
+}
+
 -- HUD元素配置
 local hud_elements = {
     {
         filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_hud",
         class_name = "HudHitKillICON",
+        visibility_groups = HUD_VISIBILITY_GROUPS,
     },
     -- §13.D.2 CF HUD（2026-07-01）
     {
         filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_cf_hud",
         class_name = "HudHitKillCF",
+        visibility_groups = HUD_VISIBILITY_GROUPS,
     },
     -- §21 BF4 风格文字击杀信息与独立计分 HUD
     {
         filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_score_feed_hud",
         class_name = "HudHitKillScoreFeed",
+        visibility_groups = HUD_VISIBILITY_GROUPS,
     },
 }
 
@@ -108,7 +120,7 @@ HKS:hook("UIHud", "init", function(func, self, elements, visibility_groups, para
                 class_name = hud_element.class_name,
                 filename = hud_element.filename,
                 use_hud_scale = true,
-                visibility_groups = hud_element.visibility_groups or {"alive"},
+                visibility_groups = hud_element.visibility_groups or HUD_VISIBILITY_GROUPS,
             })
         end
     end

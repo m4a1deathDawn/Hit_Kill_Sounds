@@ -1,3 +1,4 @@
+-- luacheck: globals get_mod
 local HKS = get_mod("Hit_Kill_Sounds")
 
 -- 游戏选项列表（使用本地化文本）
@@ -144,14 +145,14 @@ return {
                     {
                         setting_id = "bf4_feed_horizontal_position",
                         type = "numeric",
-                        default_value = 50,
+                        default_value = 50, -- bf4_score_feed_offset_x = 18
                         range = {0, 100},
                         step = 5,
                     },
                     {
                         setting_id = "bf4_feed_vertical_position",
                         type = "numeric",
-                        default_value = 0,
+                        default_value = 25, -- bf4_score_feed_offset_y = 25
                         range = {0, 100},
                         step = 5,
                     },
@@ -403,19 +404,19 @@ return {
                             {
                                 setting_id = "kill_icon_headshot_color_g",
                                 type = "numeric",
-                                default_value = 0,
+                                default_value = 140,
                                 range = {0, 255},
                             },
                             {
                                 setting_id = "kill_icon_headshot_color_b",
                                 type = "numeric",
-                                default_value = 0,
+                                default_value = 20,
                                 range = {0, 255},
                             },
                             {
                                 setting_id = "kill_icon_vertical_position",
                                 type = "numeric",
-                                default_value = 0,
+                                default_value = 75,
                                 range = {0, 100},
                                 step = 5,
                             },

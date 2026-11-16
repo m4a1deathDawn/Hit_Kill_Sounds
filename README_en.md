@@ -2,7 +2,7 @@
 
 A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
 
-Current version: v1.5.0
+Current version: v1.5.1
 
 ## Features
 
@@ -164,6 +164,23 @@ Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/Hi
 This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
 
 ## Changelog
+
+### v1.5.1
+- **Battlefield V (BFV) authentic audio-visual restoration & leaving-slot fixes**:
+  - Separated `killsound_bfv_headshotadd.wav` (2.077s low-frequency metallic resonance tail) from `headshot1~10.wav` (transient helmet crack pool), dispatching both on the same frame with 0ms delay on headshot kills and binding `replace_group = "bfv_headshot_add"` to prevent voice pool exhaustion.
+  - Fixed `_leaving_slots` per-frame self-multiplicative decay and the Lua `0 or 1` invisibility trap when overflowing on the same frame with `render_alpha = 0`.
+  - Restored BFV Cubic Ease-Out (`1.85 -> 1.0`) entry slam (vertical center drop for a single icon, `+28 * scale` slide-in when queued), Quartic Ease-Out (`0.85 -> 2.8`) background (`z = -1`) headshot ring shockwave, and two-stage natural fade (30% horizontal micro-convergence + 70% quadratic fade with `1.0 -> 0.88` scale shrink).
+- **CrossFire (CF) visual size normalization & animation upgrade**:
+  - Added `GOLD_HEADSHOT_TEX_SCALE = 0.75` to normalize `headshot_gold.png` (100% canvas fill) against `kill1~6.png` (65.2%×74.2% canvas fill), and restored the gold headshot skull when killing a Boss with a headshot at zero streak.
+  - Restored CF first-kill heavy slam (`2.15 -> 0.92 -> 1.0` with Alpha `0.25 -> 1.0`), streak upgrade two-stage elastic pulse (`0.82 -> 1.28 -> 1.0`), tail micro-expansion fade (`1.0 -> 1.08`), and an underlying `afterimage` expansion pass (`1.0x -> 1.65x`).
+- **Battlefield 4 (BF4) staggered reveal timing & independent right tally column**:
+  - Added `refresh_visible_targets` and `trigger_tally_roll`: fixed staggered entries (`reveal_at`) finishing their slide while hidden or spawning mid-air, preserved smooth upward push transitions for existing rows, and anchored score roll interpolation with `roll_start_score`.
+  - Removed the redundant `- event_pass_width` (32px gap bug) and moved the cumulative tally to an independent right-hand column (`base_x + 88 * scale`, left-aligned), eliminating text overlap on rows 3–8 and vertical jumping.
+- **Audio backend, dependency integration & HUD performance optimizations**:
+  - `Hit_Kill_Sounds_audio_backend.lua`: Stopped replaced voices (`stop_active_replace_group`) before `make_voice_room`; moved `MIN_DISPATCH_INTERVAL` outside the per-frame dispatch loop; enabled a 25ms micro fade-out (`0.025s`) in `stop_active_voice` to eliminate waveform clipping clicks; prevented accidental fallback to the legacy HTTP player when `using_simple_audio == true`.
+  - `Hit_Kill_Sounds_bgm.lua`: Added a `0.4s` fade-out on stop and async initialization retry protection (up to 5 retries at 0.5s intervals) in `play_track`.
+  - `Hit_Kill_Sounds_events.lua`: Prioritized `SimpleAudio.glob` for fast CF asset scanning; optimized `is_event_silenced` with an $O(1)$ `has_silenced_patterns` short-circuit and plain `string.find` matching; excluded `has_scripted_death_sequence` targets and decoupled `bf4_eligible` from `killstreak_enabled`.
+  - Added idle `update`/`draw` short-circuits across all three HUD elements, cached `_text_size` widths in BF4 HUD, added texture preload retry protection, and expanded `visibility_groups` to include `player_in_danger_zone`, `communication_wheel`, `emote_wheel`, and `tactical_overlay`.
 
 ### v1.5.0
 - **BFV lifecycle and queue fixes**: The tenth main icon is retained and the eleventh evicts the oldest; bounded leaving copies, symmetric spacing, scale-aware layout, entry/ring effects, natural fade, and overflow eviction are time-driven.

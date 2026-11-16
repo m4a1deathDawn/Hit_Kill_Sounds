@@ -1,6 +1,12 @@
 -- luacheck: globals get_mod Managers
 local HKS = get_mod("Hit_Kill_Sounds")
 
+local table_clear = table.clear or function(t)
+    for k in pairs(t) do
+        t[k] = nil
+    end
+end
+
 local MAX_ENTRIES = 8
 local BASE_FONT_SIZE = 22
 local BASE_LINE_HEIGHT = 34
@@ -40,6 +46,8 @@ local ScoreFeed = {
     _tally = {
         accumulated_total_score = 0,
         displayed_total_score = 0,
+        displayed_score = 0,
+        roll_start_score = 0,
         scale_multiplier = 1,
         alpha = 0,
         fade_state = "hidden",
@@ -70,22 +78,6 @@ local function calculate_line_height()
     return math.max(1, math.floor(font_size * BASE_LINE_HEIGHT / BASE_FONT_SIZE + 0.5))
 end
 
-local function sync_line_height()
-    local line_height = calculate_line_height()
-
-    if line_height == ScoreFeed._line_height then
-        return
-    end
-
-    local entry_count = #ScoreFeed._entries
-
-    for index, entry in ipairs(ScoreFeed._entries) do
-        entry.target_y = -(entry_count - index) * line_height
-    end
-
-    ScoreFeed._line_height = line_height
-end
-
 local function now_time()
     if Managers and Managers.time then
         return Managers.time:time("main")
@@ -95,8 +87,7 @@ local function now_time()
 end
 
 local function is_feed_enabled()
-    return HKS:get("enabled") ~= false and HKS:get("bf4_feed_enabled") == true and
-        HKS:get("killstreak_enabled") ~= false
+    return HKS:get("enabled") ~= false and HKS:get("bf4_feed_enabled") == true
 end
 
 local function get_feed_duration()
@@ -118,12 +109,41 @@ end
 local function reset_tally(tally)
     tally.accumulated_total_score = 0
     tally.displayed_total_score = 0
+    tally.displayed_score = 0
+    tally.roll_start_score = 0
     tally.scale_multiplier = 1
     tally.alpha = 0
     tally.fade_state = "hidden"
     tally.scale_elapsed = TALLY_PUNCH_TIME
     tally.roll_elapsed = TALLY_ROLL_TIME
     tally.fade_elapsed = 0
+    tally.y_offset = 0
+end
+
+local function trigger_tally_roll(tally, batch_score)
+    tally = tally or ScoreFeed._tally
+    if tally.fade_state == "hidden" or tally.alpha <= 0 then
+        tally.displayed_total_score = 0
+        tally.displayed_score = 0
+        tally.roll_start_score = 0
+    else
+        local current_displayed = tally.displayed_total_score
+        if tally.displayed_score ~= nil and tally.displayed_score ~= current_displayed then
+            current_displayed = tally.displayed_score
+            tally.displayed_total_score = current_displayed
+        end
+        tally.roll_start_score = current_displayed or 0
+    end
+
+    if batch_score ~= nil then
+        tally.accumulated_total_score = (tally.accumulated_total_score or 0) + (tonumber(batch_score) or 0)
+    end
+    tally.scale_multiplier = 1.3
+    tally.scale_elapsed = 0
+    tally.roll_elapsed = 0
+    tally.fade_state = "visible"
+    tally.fade_elapsed = 0
+    tally.alpha = 1
     tally.y_offset = 0
 end
 
@@ -141,24 +161,54 @@ local function event_color(event_key)
     return copy_color(EVENT_COLORS[event_key] or EVENT_COLORS.bf4_feed_enemy_killed)
 end
 
-local function rebuild_entries_from_batches()
-    table.clear(ScoreFeed._entries)
-    local entry_count = 0
+local function refresh_visible_targets(current_time)
+    current_time = tonumber(current_time) or now_time()
+    local line_height = ScoreFeed._line_height
+    local visible_list = {}
+
+    for _, entry in ipairs(ScoreFeed._entries) do
+        if current_time >= (entry.reveal_at or 0) then
+            visible_list[#visible_list + 1] = entry
+        else
+            entry.visible_slot_index = nil
+        end
+    end
+
+    local visible_count = #visible_list
+    for idx, entry in ipairs(visible_list) do
+        local visible_slot_index = visible_count - idx + 1
+        local target_y = -(visible_slot_index - 1) * line_height
+        entry.visible_slot_index = visible_slot_index
+        entry.target_y = target_y
+        if not entry._revealed then
+            -- Anchor newly revealed entry slightly below its target slot so it slides up smoothly
+            entry.current_y = target_y + 0.35 * line_height
+            entry._revealed = true
+        end
+    end
+end
+
+local function sync_line_height()
+    local line_height = calculate_line_height()
+
+    if line_height == ScoreFeed._line_height then
+        return
+    end
+
+    ScoreFeed._line_height = line_height
+    refresh_visible_targets(now_time())
+end
+
+local function rebuild_entries_from_batches(current_time)
+    table_clear(ScoreFeed._entries)
 
     for _, batch in ipairs(ScoreFeed._batches) do
         for _, entry in ipairs(batch.entries) do
-            entry_count = entry_count + 1
-            local target_y = -(entry_count - 1) * ScoreFeed._line_height
-            entry.target_y = target_y
-            entry.current_y = target_y
             ScoreFeed._entries[#ScoreFeed._entries + 1] = entry
         end
     end
 
-    for index, entry in ipairs(ScoreFeed._entries) do
-        entry.target_y = -(#ScoreFeed._entries - index) * ScoreFeed._line_height
-        entry.current_y = math.max(entry.current_y or entry.target_y, entry.target_y)
-    end
+    refresh_visible_targets(current_time or now_time())
 end
 
 local function prune_expired_batches(current_time)
@@ -171,7 +221,7 @@ local function prune_expired_batches(current_time)
     end
 
     if changed then
-        rebuild_entries_from_batches()
+        rebuild_entries_from_batches(current_time)
     end
 
     return changed
@@ -190,8 +240,8 @@ local function drop_old_batches_for_capacity()
 end
 
 function ScoreFeed.clear()
-    table.clear(ScoreFeed._entries)
-    table.clear(ScoreFeed._batches)
+    table_clear(ScoreFeed._entries)
+    table_clear(ScoreFeed._batches)
     ScoreFeed._last_activity_time = 0
     reset_tally(ScoreFeed._tally)
 end
@@ -247,24 +297,18 @@ function ScoreFeed.add_batch(batch)
             current_y = 0,
             target_y = 0,
             alpha = 0,
+            _revealed = false,
+            visible_slot_index = nil,
         }
     end
 
     ScoreFeed._batches[#ScoreFeed._batches + 1] = batch_record
     drop_old_batches_for_capacity()
     sync_line_height()
-    rebuild_entries_from_batches()
+    rebuild_entries_from_batches(created_at)
 
     ScoreFeed._last_activity_time = created_at
-    local tally = ScoreFeed._tally
-    tally.accumulated_total_score = tally.accumulated_total_score + batch_score
-    tally.scale_multiplier = 1.3
-    tally.scale_elapsed = 0
-    tally.roll_elapsed = 0
-    tally.fade_state = "visible"
-    tally.fade_elapsed = 0
-    tally.alpha = 1
-    tally.y_offset = 0
+    trigger_tally_roll(ScoreFeed._tally, batch_score)
 
     return true
 end
@@ -312,6 +356,8 @@ end
 
 local function update_entries(step_dt, current_time)
     prune_expired_batches(current_time)
+    refresh_visible_targets(current_time)
+
     local duration = get_feed_duration()
     local fade_out_time = math.min(0.5, duration * 0.35)
     local hold_end = duration - fade_out_time
@@ -322,22 +368,20 @@ local function update_entries(step_dt, current_time)
 
         if age >= duration then
             table.remove(ScoreFeed._entries, index)
+        elseif current_time < entry.reveal_at then
+            entry.reveal_elapsed = 0
+            entry.alpha = 0
         else
+            entry.reveal_elapsed = current_time - entry.reveal_at
             local move_alpha = 1 - math.exp(-16 * step_dt)
             entry.current_y = entry.current_y + (entry.target_y - entry.current_y) * move_alpha
 
-            if current_time < entry.reveal_at then
-                entry.reveal_elapsed = 0
-                entry.alpha = 0
+            if entry.reveal_elapsed < FADE_IN_TIME then
+                entry.alpha = clamp(entry.reveal_elapsed / FADE_IN_TIME, 0, 1)
+            elseif age >= hold_end then
+                entry.alpha = clamp((duration - age) / fade_out_time, 0, 1)
             else
-                entry.reveal_elapsed = current_time - entry.reveal_at
-                if age < FADE_IN_TIME then
-                    entry.alpha = clamp(age / FADE_IN_TIME, 0, 1)
-                elseif age >= hold_end then
-                    entry.alpha = clamp((duration - age) / fade_out_time, 0, 1)
-                else
-                    entry.alpha = 1
-                end
+                entry.alpha = 1
             end
         end
     end
@@ -353,12 +397,14 @@ local function update_tally(step_dt, current_time)
 
         tally.roll_elapsed = math.min(tally.roll_elapsed + step_dt, TALLY_ROLL_TIME)
         local roll_progress = clamp(tally.roll_elapsed / TALLY_ROLL_TIME, 0, 1)
-        local eased = 1 - (1 - roll_progress) * (1 - roll_progress)
-        tally.displayed_total_score = math.floor(tally.displayed_total_score +
-            (tally.accumulated_total_score - tally.displayed_total_score) * eased + 0.5)
+        local eased = 1 - (1 - roll_progress) ^ 3
+        local start_score = tally.roll_start_score or 0
+        tally.displayed_total_score = math.floor(start_score +
+            (tally.accumulated_total_score - start_score) * eased + 0.5)
         if roll_progress >= 1 then
             tally.displayed_total_score = tally.accumulated_total_score
         end
+        tally.displayed_score = tally.displayed_total_score
 
         if ScoreFeed._last_activity_time > 0 and current_time - ScoreFeed._last_activity_time >= get_reset_time() then
             start_tally_fade(tally)
@@ -398,6 +444,9 @@ function ScoreFeed.update(dt)
     update_entries(step_dt, current_time)
     update_tally(step_dt, current_time)
 end
+
+ScoreFeed.refresh_visible_targets = refresh_visible_targets
+ScoreFeed.trigger_tally_roll = trigger_tally_roll
 
 function ScoreFeed.get_entries()
     return ScoreFeed._entries

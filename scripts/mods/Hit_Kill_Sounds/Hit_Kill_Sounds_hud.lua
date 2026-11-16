@@ -94,6 +94,25 @@ local function oldest_active_slot()
     return oldest
 end
 
+local function has_active_slots(slots_list, leaving_list)
+    slots_list = slots_list or manager._slots
+    leaving_list = leaving_list or manager._leaving_slots
+
+    for i = 1, #slots_list do
+        local s = slots_list[i]
+        if s and s.active ~= false then
+            return true
+        end
+    end
+    for i = 1, #leaving_list do
+        local s = leaving_list[i]
+        if s and s.active ~= false then
+            return true
+        end
+    end
+    return false
+end
+
 local function copy_overflow_slot(source, now)
     local destination
     for _, slot in ipairs(manager._leaving_slots) do
@@ -106,6 +125,9 @@ local function copy_overflow_slot(source, now)
         end
     end
 
+    local fade_start_alpha = (source.render_alpha ~= nil and source.render_alpha > 0) and source.render_alpha or 1
+    local fade_start_scale = (source.render_scale ~= nil and source.render_scale > 0) and source.render_scale or 1
+
     destination.active = true
     destination.leaving = true
     destination.is_headshot = source.is_headshot
@@ -114,9 +136,37 @@ local function copy_overflow_slot(source, now)
     destination.target_x = source.current_x
     destination.leaving_start_time = now
     destination.fade_start_time = nil
-    destination.render_alpha = source.render_alpha or 1
-    destination.render_scale = source.render_scale or get_size_scale()
+    destination.fade_start_alpha = fade_start_alpha
+    destination.fade_start_scale = fade_start_scale
+    destination.render_alpha = fade_start_alpha
+    destination.render_scale = fade_start_scale
+    return destination
 end
+
+local function update_leaving_slot_state(slot, now, size_scale)
+    local leave_t = math.min(1, math.max(0, (now - slot.leaving_start_time) / OVERFLOW_LEAVE_DURATION))
+    if leave_t >= 1 then
+        reset_slot(slot)
+        return false
+    end
+    local eased = 1 - (1 - leave_t) ^ 3
+    slot.current_x = slot.target_x - LEAVE_OFFSET * (size_scale or 1) * eased
+    slot.render_alpha = (slot.fade_start_alpha or 1) * (1 - leave_t)
+    slot.render_scale = (slot.fade_start_scale or 1) * (1 - 0.15 * leave_t)
+    return true
+end
+
+local function update_leaving_slots(now, size_scale)
+    size_scale = size_scale or get_size_scale()
+    for _, slot in ipairs(manager._leaving_slots) do
+        if slot.active then
+            update_leaving_slot_state(slot, now, size_scale)
+        end
+    end
+end
+
+manager.copy_overflow_slot = copy_overflow_slot
+manager.update_leaving_slots = update_leaving_slots
 
 manager.show_icon = function(is_headshot)
     local now = Managers.time:time("main")
@@ -137,6 +187,7 @@ manager.show_icon = function(is_headshot)
     end
     if not slot then return end
 
+    local size_scale = get_size_scale()
     manager._next_order = manager._next_order + 1
     slot.active = true
     slot.is_headshot = is_headshot == true
@@ -146,18 +197,38 @@ manager.show_icon = function(is_headshot)
     slot.order = manager._next_order
     slot.leaving = false
     slot.fade_start_time = nil
+    slot.fade_start_alpha = 1
+    slot.fade_start_scale = 1
     slot.render_alpha = 0
-    slot.render_scale = 2.1 * get_size_scale()
+    slot.render_scale = 0
     manager._last_kill_time = now
     manager._natural_fade_start = nil
     recompute_targets()
-    slot.current_x = slot.target_x + 24 * get_size_scale()
+
+    local active_count = #sorted_active_slots()
+    local has_leaving = false
+    for _, leaving_slot in ipairs(manager._leaving_slots) do
+        if leaving_slot.active then
+            has_leaving = true
+            break
+        end
+    end
+    local slide_offset = (active_count > 1 or has_leaving) and (28 * size_scale) or 0
+    slot.slide_offset_x = slide_offset
+    slot.current_x = slot.target_x + slide_offset
+end
+
+local function textures_ready()
+    return _textures.normal ~= nil and _textures.headshot ~= nil and _textures.circle ~= nil
 end
 
 local function preload_textures_legacy()
     if HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.start_player then HKS.HitKillSoundsPlayer.start_player() end
     local host = HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.host
-    if not host then return end
+    if not host then
+        textures_load_started = false
+        return
+    end
     local urls = {
         normal = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_normal.png",
         headshot = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_headshot.png",
@@ -171,12 +242,22 @@ local function preload_textures_legacy()
 end
 
 local function preload_textures()
+    if textures_ready() then return end
     if textures_load_started then return end
     textures_load_started = true
     if HKS.HitKillSoundsAssetsBackend then
-        HKS.HitKillSoundsAssetsBackend.load_bf5_icons(_textures, preload_textures_legacy)
+        HKS.HitKillSoundsAssetsBackend.load_bf5_icons(_textures, function()
+            textures_load_started = false
+            preload_textures_legacy()
+        end)
+        if not textures_ready() then
+            textures_load_started = false
+        end
     else
         preload_textures_legacy()
+        if not textures_ready() then
+            textures_load_started = false
+        end
     end
 end
 
@@ -189,7 +270,7 @@ for i = 1, MAX_SLOTS + MAX_LEAVING_SLOTS do
     }
     scenegraph_definition["circle_root_" .. i] = {
         horizontal_alignment = "center", parent = "icon_root_" .. i,
-        vertical_alignment = "center", size = {ICON_ROOT_SIZE, ICON_ROOT_SIZE}, position = {0, 0, 1},
+        vertical_alignment = "center", size = {ICON_ROOT_SIZE, ICON_ROOT_SIZE}, position = {0, 0, -1},
     }
     widget_definitions["kill_icon_" .. i] = UIWidget.create_definition({{
         style_id = "icon", value_id = "icon", pass_type = "texture",
@@ -211,6 +292,10 @@ HudHitKillICON.init = function(self, parent, draw_layer, start_scale)
     HudHitKillICON.super.init(self, parent, draw_layer, start_scale, {
         scenegraph_definition = scenegraph_definition, widget_definitions = widget_definitions,
     })
+    self._slots = manager._slots
+    self._leaving_slots = manager._leaving_slots
+    self._was_active = true
+    self._has_active_content = false
     preload_textures()
 end
 
@@ -239,19 +324,13 @@ local function update_item(self, slot, index, now, step_dt, y_pos, size_scale, t
     if not root then return end
 
     if is_leaving then
-        local progress = math.min(1, math.max(0, (now - slot.leaving_start_time) / OVERFLOW_LEAVE_DURATION))
-        if progress >= 1 then
-            reset_slot(slot)
+        if not update_leaving_slot_state(slot, now, size_scale) then
             clear_widget(icon_widget, circle_widget)
             return
         end
-        local eased = 1 - (1 - progress) ^ 3
-        slot.current_x = slot.target_x - LEAVE_OFFSET * size_scale * eased
-        slot.render_alpha = (slot.render_alpha or 1) * (1 - eased)
-        slot.render_scale = (slot.render_scale or size_scale) * (1 - 0.08 * eased)
         local color = slot.is_headshot and colors.headshot or colors.normal
         set_icon_style(icon_widget, slot.is_headshot and _textures.headshot or _textures.normal,
-            255 * slot.render_alpha * transparency_factor, color, ICON_SIZE * slot.render_scale, ICON_ROOT_SIZE)
+            255 * slot.render_alpha * transparency_factor, color, ICON_SIZE * size_scale * slot.render_scale, ICON_ROOT_SIZE)
         clear_widget(nil, circle_widget)
     else
         local elapsed = math.max(0, now - slot.start_time)
@@ -261,28 +340,35 @@ local function update_item(self, slot, index, now, step_dt, y_pos, size_scale, t
             for _, active in ipairs(manager._slots) do
                 if active.active then
                     active.fade_start_time = now
-                    active.fade_start_alpha = active.render_alpha or 1
-                    active.fade_start_scale = active.render_scale or size_scale
+                    active.fade_start_alpha = (active.render_alpha ~= nil and active.render_alpha > 0) and active.render_alpha or 1
+                    active.fade_start_scale = (active.render_scale ~= nil and active.render_scale > 0) and active.render_scale or 1
                 end
             end
         end
-        local enter_progress = math.min(1, elapsed / ENTER_DURATION)
-        local scale_multiplier
-        if enter_progress < 0.62 then
-            scale_multiplier = 2.1 + (0.9 - 2.1) * (enter_progress / 0.62)
-        else
-            scale_multiplier = 0.9 + (1 - 0.9) * ((enter_progress - 0.62) / 0.38)
-        end
+        local scale_t = math.min(1, math.max(0, elapsed / ENTER_DURATION))
+        local scale_eased = 1 - (1 - scale_t) ^ 3
+        local scale_multiplier = 1.85 + (1.0 - 1.85) * scale_eased
         local alpha = math.min(1, elapsed / ENTER_ALPHA_DURATION)
         if slot.fade_start_time then
             local fade_progress = math.min(1, math.max(0, (now - slot.fade_start_time) / NATURAL_FADE_DURATION))
-            local eased = 1 - (1 - fade_progress) ^ 3
-            alpha = slot.fade_start_alpha * (1 - eased)
-            scale_multiplier = (slot.fade_start_scale / size_scale) * (1 - 0.12 * eased)
             if fade_progress >= 1 then
                 reset_slot(slot)
                 clear_widget(icon_widget, circle_widget)
                 return
+            end
+            local screen_width = UIWorkspaceSettings.screen.size[1]
+            local horizontal = tonumber(HKS:get("kill_icon_horizontal_position")) or 50
+            local base_x = screen_width * horizontal / 100 - ICON_ROOT_SIZE / 2
+            local pull_t = math.min(1, fade_progress / 0.3)
+            slot.target_x = slot.target_x + (base_x - slot.target_x) * (0.15 * pull_t)
+            if fade_progress < 0.3 then
+                alpha = slot.fade_start_alpha
+                scale_multiplier = slot.fade_start_scale
+            else
+                local tail_t = (fade_progress - 0.3) / 0.7
+                local fade_eased = tail_t * tail_t
+                alpha = slot.fade_start_alpha * (1 - fade_eased)
+                scale_multiplier = slot.fade_start_scale * (1.0 + (0.88 - 1.0) * tail_t)
             end
         end
         if step_dt > 0 then
@@ -290,22 +376,22 @@ local function update_item(self, slot, index, now, step_dt, y_pos, size_scale, t
             slot.current_x = slot.current_x + (slot.target_x - slot.current_x) * move_alpha
         end
         slot.render_alpha = alpha
-        slot.render_scale = scale_multiplier * size_scale
+        slot.render_scale = scale_multiplier
         root.position[1] = slot.current_x
         root.position[2] = y_pos
         local color = slot.is_headshot and colors.headshot or colors.normal
         set_icon_style(icon_widget, slot.is_headshot and _textures.headshot or _textures.normal,
-            255 * alpha * transparency_factor, color, ICON_SIZE * slot.render_scale, ICON_ROOT_SIZE)
+            255 * alpha * transparency_factor, color, ICON_SIZE * size_scale * slot.render_scale, ICON_ROOT_SIZE)
         local ring_style = circle_widget and circle_widget.style and circle_widget.style.circle
         if slot.is_headshot and ring_style and _textures.circle then
-            local ring_progress = math.min(1, math.max(0, elapsed / RING_DURATION))
-            if ring_progress < 1 then
-                local eased_ring = ring_progress ^ 0.78
-                local ring_scale = 0.75 + (2.4 - 0.75) * eased_ring
+            local ring_t = math.min(1, math.max(0, elapsed / RING_DURATION))
+            if ring_t < 1 then
+                local eased_ring = 1 - (1 - ring_t) ^ 4
+                local ring_scale = 0.85 + (2.8 - 0.85) * eased_ring
                 ring_style.material_values.texture_map = _textures.circle
                 ring_style.size = {math.floor(ICON_SIZE * size_scale * ring_scale), math.floor(ICON_SIZE * size_scale * ring_scale)}
                 ring_style.offset = {math.floor((ICON_ROOT_SIZE - ring_style.size[1]) / 2), math.floor((ICON_ROOT_SIZE - ring_style.size[2]) / 2), 0}
-                ring_style.color = {math.floor(255 * (1 - ring_progress) * transparency_factor), colors.headshot[1], colors.headshot[2], colors.headshot[3]}
+                ring_style.color = {math.floor(255 * ((1 - ring_t) ^ 1.8) * transparency_factor), colors.headshot[1], colors.headshot[2], colors.headshot[3]}
             else
                 ring_style.material_values.texture_map = nil
             end
@@ -320,37 +406,63 @@ end
 HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, input_service)
     local step_dt = math.max(tonumber(dt) or 0, 0)
     if not HKS:get("enabled") or HKS:get("kill_icon_style") ~= "BF5" or not HKS:get("kill_icon_enabled") then
-        manager.clear()
-        for i = 1, MAX_SLOTS + MAX_LEAVING_SLOTS do clear_widget(self._widgets_by_name["kill_icon_" .. i], self._widgets_by_name["circle_icon_" .. i]) end
+        if self._was_active or has_active_slots(self._slots, self._leaving_slots) then
+            manager.clear()
+            for i = 1, MAX_SLOTS + MAX_LEAVING_SLOTS do
+                clear_widget(self._widgets_by_name["kill_icon_" .. i], self._widgets_by_name["circle_icon_" .. i])
+            end
+            self._update_scenegraph = true
+            self._was_active = false
+            self._has_active_content = false
+        end
         return
     end
 
+    if not has_active_slots(self._slots, self._leaving_slots) then
+        if self._was_active then
+            for i = 1, MAX_SLOTS + MAX_LEAVING_SLOTS do
+                clear_widget(self._widgets_by_name["kill_icon_" .. i], self._widgets_by_name["circle_icon_" .. i])
+            end
+            self._update_scenegraph = true
+            self._was_active = false
+            self._has_active_content = false
+            HudHitKillICON.super.update(self, dt, t, ui_renderer, render_settings, input_service)
+        end
+        return
+    end
+
+    self._was_active = true
+    self._has_active_content = true
+
     local size_scale = get_size_scale()
-    local vert_pos = tonumber(HKS:get("kill_icon_vertical_position")) or 0
+    local vert_pos = tonumber(HKS:get("kill_icon_vertical_position")) or 75
     local screen_height = UIWorkspaceSettings.screen.size[2]
     local y_pos = (vert_pos / 100) * (screen_height - ICON_ROOT_SIZE)
     local transparency_factor = (tonumber(HKS:get("kill_icon_transparency")) or 100) / 100
     local colors = {
         normal = {HKS:get("kill_icon_normal_color_r") or 255, HKS:get("kill_icon_normal_color_g") or 255, HKS:get("kill_icon_normal_color_b") or 255},
-        headshot = {HKS:get("kill_icon_headshot_color_r") or 255, HKS:get("kill_icon_headshot_color_g") or 0, HKS:get("kill_icon_headshot_color_b") or 0},
+        headshot = {HKS:get("kill_icon_headshot_color_r") or 255, HKS:get("kill_icon_headshot_color_g") or 140, HKS:get("kill_icon_headshot_color_b") or 20},
     }
     recompute_targets()
+    local now = Managers.time:time("main")
     for i = 1, MAX_SLOTS do
         local slot = manager._slots[i]
-        if slot.active then update_item(self, slot, i, Managers.time:time("main"), step_dt, y_pos, size_scale, transparency_factor, colors, false)
+        if slot.active then update_item(self, slot, i, now, step_dt, y_pos, size_scale, transparency_factor, colors, false)
         else clear_widget(self._widgets_by_name["kill_icon_" .. i], self._widgets_by_name["circle_icon_" .. i]) end
     end
     for i = 1, MAX_LEAVING_SLOTS do
         local slot = manager._leaving_slots[i]
         local index = MAX_SLOTS + i
-        if slot.active then update_item(self, slot, index, Managers.time:time("main"), step_dt, y_pos, size_scale, transparency_factor, colors, true)
+        if slot.active then update_item(self, slot, index, now, step_dt, y_pos, size_scale, transparency_factor, colors, true)
         else clear_widget(self._widgets_by_name["kill_icon_" .. index], self._widgets_by_name["circle_icon_" .. index]) end
     end
+    self._has_active_content = has_active_slots(self._slots, self._leaving_slots)
     self._update_scenegraph = true
     HudHitKillICON.super.update(self, dt, t, ui_renderer, render_settings, input_service)
 end
 
 HudHitKillICON.draw = function(self, dt, t, ui_renderer, render_settings, input_service)
+    if not self._has_active_content or not has_active_slots(self._slots, self._leaving_slots) then return end
     if not HKS:get("enabled") or HKS:get("kill_icon_style") ~= "BF5" or not HKS:get("kill_icon_enabled") then return end
     local game_mode_name = Managers.state.game_mode and Managers.state.game_mode:game_mode_name()
     if game_mode_name == "hub" then return end

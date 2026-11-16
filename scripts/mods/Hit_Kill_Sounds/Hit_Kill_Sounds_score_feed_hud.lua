@@ -14,23 +14,17 @@ local MAX_EVENT_WIDTH = 520
 local MAX_SCORE_WIDTH = 120
 local INITIAL_LINE_HEIGHT = ScoreFeed and ScoreFeed.get_line_height and ScoreFeed.get_line_height() or 34
 local HEADSHOT_EVENT_FONT_SCALE = 0.9
-local TEXT_GAP = 8
+local TEXT_GAP = 10
 local BOTTOM_MARGIN = 90
 local TOP_MARGIN = 90
-local TALLY_OFFSET_X = 95
-local TALLY_OFFSET_Y = 68
+local TALLY_OFFSET_X = 88
 
 local function clamp(value, minimum, maximum)
     return math.max(minimum, math.min(maximum, value))
 end
 
-local function setting_percent(setting_id, default_value)
-    return clamp(tonumber(HKS:get(setting_id)) or default_value, 0, 100)
-end
-
 local function feed_visible()
-    return HKS:get("enabled") ~= false and HKS:get("bf4_feed_enabled") == true and
-        HKS:get("killstreak_enabled") ~= false
+    return HKS:get("enabled") ~= false and HKS:get("bf4_feed_enabled") == true
 end
 
 local function is_in_hub()
@@ -51,6 +45,7 @@ local function create_text_style(font_size, text_alignment, text_color, width, h
     style.font_type = "proxima_nova_bold"
     style.font_size = font_size
     style.text_horizontal_alignment = text_alignment
+    style.horizontal_alignment = text_alignment
     style.text_vertical_alignment = "center"
     style.vertical_alignment = "top"
     style.text_color = text_color
@@ -124,15 +119,23 @@ widget_definitions.score_feed_tally = UIWidget.create_definition({
         style_id = "tally",
         value = "",
         value_id = "tally_text",
-        style = create_text_style(BASE_FONT_SIZE * 1.25, "center", {255, 255, 220, 80}, 260, INITIAL_LINE_HEIGHT * 2),
+        style = create_text_style(BASE_FONT_SIZE * 1.85, "left", {255, 245, 250, 255}, 260, INITIAL_LINE_HEIGHT * 2),
     },
 }, "score_feed_tally_root")
 
 local function get_base_position()
     local screen_width = UIWorkspaceSettings.screen.size[1]
     local screen_height = UIWorkspaceSettings.screen.size[2]
-    local horizontal = setting_percent("bf4_feed_horizontal_position", 50)
-    local vertical = setting_percent("bf4_feed_vertical_position", 0)
+    local raw_h = HKS:get("bf4_feed_horizontal_position")
+    if raw_h == nil then
+        raw_h = HKS:get("bf4_score_feed_offset_x")
+    end
+    local raw_v = HKS:get("bf4_feed_vertical_position")
+    if raw_v == nil then
+        raw_v = HKS:get("bf4_score_feed_offset_y")
+    end
+    local horizontal = clamp(tonumber(raw_h) or 50, 0, 100)
+    local vertical = clamp(tonumber(raw_v) or 25, 0, 100)
     local usable_height = math.max(screen_height - TOP_MARGIN - BOTTOM_MARGIN, 1)
     local base_x = screen_width * horizontal / 100
     local base_y = screen_height - BOTTOM_MARGIN - usable_height * vertical / 100
@@ -198,6 +201,9 @@ function HudHitKillScoreFeed:init(parent, draw_layer, start_scale)
         widget_definitions = widget_definitions,
     })
 
+    self._has_visible_content = false
+    self._was_visible = false
+
     for index = 1, MAX_ENTRIES do
         hide_widget(self._widgets_by_name["score_feed_entry_" .. index])
     end
@@ -205,40 +211,69 @@ function HudHitKillScoreFeed:init(parent, draw_layer, start_scale)
     hide_widget(self._widgets_by_name.score_feed_tally)
 end
 
-function HudHitKillScoreFeed:_update_entry_widget(widget, entry, base_x, base_y, ui_renderer, font_size, line_height)
+function HudHitKillScoreFeed:_update_entry_widget(widget, entry, base_x, base_y, ui_renderer, font_size, line_height, scale)
+    if (entry.alpha or 0) <= 0 then
+        hide_widget(widget)
+        return false
+    end
+
+    local s = scale or get_text_scale()
     local full_event_text = HKS:localize(entry.event_key) or entry.event_key
     local full_score_text = format_score(entry.score)
-    local typewriter_speed = get_typewriter_speed()
+    local base_speed = get_typewriter_speed()
+    local text_len = math.max(1, Utf8.string_length(full_event_text))
+    local typewriter_speed = math.max(base_speed, math.ceil(text_len / 0.16))
     local reveal_elapsed = entry.reveal_elapsed or 0
     local event_text = get_revealed_text(full_event_text, reveal_elapsed, typewriter_speed)
-    local event_duration = Utf8.string_length(full_event_text) / typewriter_speed
-    local score_text = get_revealed_text(full_score_text, reveal_elapsed - event_duration, typewriter_speed)
+    local event_duration = text_len / typewriter_speed
+    local score_speed = math.max(typewriter_speed * 2, 60)
+    local score_text = get_revealed_text(full_score_text, reveal_elapsed - event_duration * 0.7, score_speed)
+
     local event_style = widget.style.event
     local score_style = widget.style.score
-    local event_font_scale = entry.event_key == "bf4_feed_headshot_bonus" and HEADSHOT_EVENT_FONT_SCALE or 1
+    local is_bonus = entry.event_key == "bf4_feed_headshot_bonus" or entry.event_key == "bf4_feed_multikill_bonus"
+    local event_font_scale = is_bonus and HEADSHOT_EVENT_FONT_SCALE or 1
     local event_font_size = math.max(1, math.floor(font_size * event_font_scale + 0.5))
+    local score_font_size = event_font_size
 
     event_style.font_size = event_font_size
-    score_style.font_size = font_size
+    score_style.font_size = score_font_size
 
-    local full_event_width = self:_text_size(ui_renderer, full_event_text, event_style, {MAX_EVENT_WIDTH, line_height})
-    local score_width = self:_text_size(ui_renderer, score_text, score_style, {MAX_SCORE_WIDTH, line_height})
+    if entry._cached_event_text ~= full_event_text or entry._cached_event_font_size ~= event_font_size then
+        local measured_event_width = self:_text_size(ui_renderer, full_event_text, event_style, {MAX_EVENT_WIDTH, line_height})
+        entry._cached_event_width = math.ceil(measured_event_width or 0)
+        entry._cached_event_text = full_event_text
+        entry._cached_event_font_size = event_font_size
+    end
+
+    if entry._cached_score_text ~= score_text or entry._cached_score_font_size ~= score_font_size then
+        local measured_score_width = self:_text_size(ui_renderer, score_text, score_style, {MAX_SCORE_WIDTH, line_height})
+        entry._cached_score_width = math.ceil(measured_score_width or 0)
+        entry._cached_score_text = score_text
+        entry._cached_score_font_size = score_font_size
+    end
+
+    local clean_event_width = entry._cached_event_width or 0
+    local clean_score_width = entry._cached_score_width or 0
+    local gap = math.floor(TEXT_GAP * s)
 
     event_style.text_color = entry.color
     event_style.default_text_color = entry.color
-    local event_pass_width = math.min(MAX_EVENT_WIDTH, math.max(1, (full_event_width or 0) + 32))
+    local event_pass_width = math.min(MAX_EVENT_WIDTH, math.max(1, clean_event_width + 32))
 
     event_style.size[1] = event_pass_width
     event_style.size[2] = line_height
-    event_style.offset[1] = base_x - TEXT_GAP - event_pass_width
+    -- Eliminate - event_pass_width (+32px void); align using actual measured clean_event_width
+    event_style.offset[1] = base_x - clean_event_width
     event_style.offset[2] = base_y + entry.current_y
 
     score_style.text_color = entry.color
     score_style.default_text_color = entry.color
-    local score_pass_width = math.max(1, (score_width or 0) + 16)
+    local score_pass_width = math.max(1, clean_score_width + 16)
     score_style.size[1] = score_pass_width
     score_style.size[2] = line_height
-    score_style.offset[1] = base_x + TEXT_GAP
+    -- Single-row score tightly follows event name on the right by 10 * scale
+    score_style.offset[1] = base_x + gap
     score_style.offset[2] = base_y + entry.current_y
 
     widget.content.event_text = event_text
@@ -246,38 +281,56 @@ function HudHitKillScoreFeed:_update_entry_widget(widget, entry, base_x, base_y,
     widget.content.visible = true
     widget.visible = true
     widget.alpha_multiplier = entry.alpha
+    return true
 end
 
-function HudHitKillScoreFeed:_update_tally_widget(widget, tally, base_x, base_y, ui_renderer, font_size, line_height)
+function HudHitKillScoreFeed:_update_tally_widget(widget, tally, base_x, base_y, ui_renderer, font_size, line_height, scale)
     if not widget then
-        return
+        return false
     end
 
     if tally.alpha <= 0 or tally.displayed_total_score <= 0 then
         hide_widget(widget)
 
-        return
+        return false
     end
 
+    local s = scale or get_text_scale()
     local tally_style = widget.style.tally
-    local tally_font_size = math.floor(font_size * 1.25 * tally.scale_multiplier)
+    local tally_font_size = math.max(1, math.floor(font_size * 1.85 * tally.scale_multiplier))
     local tally_text = format_score(tally.displayed_total_score)
 
     tally_style.font_size = tally_font_size
+    tally_style.text_horizontal_alignment = "left"
+    tally_style.horizontal_alignment = "left"
 
-    local tally_width = self:_text_size(ui_renderer, tally_text, tally_style, {260, line_height * 2})
+    if tally._cached_text ~= tally_text or tally._cached_font_size ~= tally_font_size then
+        local measured_tally_width = self:_text_size(ui_renderer, tally_text, tally_style, {260, line_height * 2})
+        tally._cached_width = math.ceil(measured_tally_width or 0)
+        tally._cached_text = tally_text
+        tally._cached_font_size = tally_font_size
+    end
 
-    tally_style.text_color = {255, 255, 220, 80}
-    tally_style.default_text_color = tally_style.text_color
-    tally_style.size[1] = math.max(260, (tally_width or 0) + 16)
+    local flash_t = clamp((tally.scale_multiplier - 1.0) / 0.3, 0, 1)
+    local color = {
+        255,
+        math.floor(245 + 10 * flash_t),
+        math.floor(250 - 95 * flash_t),
+        math.floor(255 - 195 * flash_t),
+    }
+    tally_style.text_color = color
+    tally_style.default_text_color = color
+    tally_style.size[1] = math.max(260, (tally._cached_width or 0) + 16)
     tally_style.size[2] = line_height * 2
-    tally_style.offset[1] = base_x + TALLY_OFFSET_X - tally_style.size[1] / 2
-    tally_style.offset[2] = base_y - TALLY_OFFSET_Y + tally.y_offset
+    -- Independent right column for BF4 cumulative tally
+    tally_style.offset[1] = base_x + math.floor(TALLY_OFFSET_X * s)
+    tally_style.offset[2] = base_y - math.floor(line_height * 0.15) + tally.y_offset
 
     widget.content.tally_text = tally_text
     widget.content.visible = true
     widget.visible = true
     widget.alpha_multiplier = tally.alpha
+    return true
 end
 
 function HudHitKillScoreFeed:_hide_all_widgets()
@@ -292,41 +345,55 @@ function HudHitKillScoreFeed:update(dt, t, ui_renderer, render_settings, input_s
     local manager = HKS.HitKillSoundsScoreFeed
 
     if not manager or not feed_visible() or is_in_hub() then
-        self:_hide_all_widgets()
+        if self._was_visible then
+            self:_hide_all_widgets()
+            self._was_visible = false
+        end
+        self._has_visible_content = false
 
         return
     end
 
+    local scale = get_text_scale()
     local base_x, base_y = get_base_position()
-    local font_size = math.floor(BASE_FONT_SIZE * get_text_scale())
+    local font_size = math.floor(BASE_FONT_SIZE * scale)
     local line_height = get_line_height()
     local entries = manager.get_entries()
+    local has_visible = false
 
     for index = 1, MAX_ENTRIES do
         local widget = self._widgets_by_name["score_feed_entry_" .. index]
         local entry = entries[index]
 
         if entry then
-            self:_update_entry_widget(widget, entry, base_x, base_y, ui_renderer, font_size, line_height)
+            if self:_update_entry_widget(widget, entry, base_x, base_y, ui_renderer, font_size, line_height, scale) then
+                has_visible = true
+            end
         else
             hide_widget(widget)
         end
     end
 
-    self:_update_tally_widget(
+    if self:_update_tally_widget(
         self._widgets_by_name.score_feed_tally,
         manager.get_tally(),
         base_x,
         base_y,
         ui_renderer,
         font_size,
-        line_height
-    )
+        line_height,
+        scale
+    ) then
+        has_visible = true
+    end
+
+    self._has_visible_content = has_visible
+    self._was_visible = has_visible
     HudHitKillScoreFeed.super.update(self, dt, t, ui_renderer, render_settings, input_service)
 end
 
 function HudHitKillScoreFeed:draw(dt, t, ui_renderer, render_settings, input_service)
-    if not feed_visible() or is_in_hub() then
+    if not self._has_visible_content or not feed_visible() or is_in_hub() then
         return
     end
 
