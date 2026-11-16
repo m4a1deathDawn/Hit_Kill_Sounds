@@ -1,4 +1,3 @@
--- luacheck: globals get_mod
 -- luacheck: globals get_mod Mods
 local HKS = get_mod("Hit_Kill_Sounds")
 
@@ -216,8 +215,9 @@ local function apply_cf_results(base_path, results, textures, on_loaded)
     local max_loaded = 0
 
     for i = 1, 30 do
-        local path = base_path .. "kill" .. i .. ".png"
-        local data = results[path]
+        local filename = "kill" .. i .. ".png"
+        local path = base_path .. filename
+        local data = results[path] or results[filename]
 
         if data and data.texture then
             textures[i] = data.texture
@@ -225,8 +225,9 @@ local function apply_cf_results(base_path, results, textures, on_loaded)
         end
     end
 
-    local headshot_path = base_path .. "headshot_gold.png"
-    local headshot = results[headshot_path]
+    local headshot_filename = "headshot_gold.png"
+    local headshot_path = base_path .. headshot_filename
+    local headshot = results[headshot_path] or results[headshot_filename]
 
     if headshot and headshot.texture then
         textures["headshot_gold"] = headshot.texture
@@ -268,13 +269,35 @@ AssetsBackend.load_cf_icons = function(textures, on_loaded, fallback)
         if fallback then fallback() end
     end
 
-    if not get_simple_assets() then
+    local SimpleAssets = get_simple_assets()
+    if not SimpleAssets then
         fallback_with_log()
         return
     end
 
+    local base_path = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/cf/"
+
+    if type(SimpleAssets.load_textures_from_dir) == "function" then
+        local ok, promise = pcall(function()
+            return SimpleAssets.load_textures_from_dir("mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/cf", false)
+        end)
+        if ok and promise and promise.next then
+            promise:next(function(results)
+                if apply_cf_results(base_path, results, textures, on_loaded) then
+                    log_cf_simple()
+                    return
+                end
+                load_cf_with_base(base_path, textures, on_loaded, fallback_with_log, false)
+            end)
+            promise_catch(promise, function()
+                load_cf_with_base(base_path, textures, on_loaded, fallback_with_log, false)
+            end)
+            return
+        end
+    end
+
     load_cf_with_base(
-        "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/cf/",
+        base_path,
         textures,
         on_loaded,
         fallback_with_log,

@@ -33,6 +33,7 @@ local MAX_ACTIVE_VOICES = 8
 local MAX_ACTIVE_HIT_VOICES = 3
 local MAX_ACTIVE_KILL_VOICES = 4
 local MAX_VOICE_AGE = 5
+local VOICE_REPLACE_FADE_OUT = 0.025
 
 local pending_queue = {}
 local active_voices = {}
@@ -199,15 +200,21 @@ local function remove_active_voice_by_id(play_id)
     end
 end
 
-local function stop_active_voice(index)
-    local voice = active_voices[index]
+local function stop_active_voice(index_or_voice, fade_out)
+    local index = type(index_or_voice) == "number" and index_or_voice or nil
+    local voice = index and active_voices[index] or (type(index_or_voice) == "table" and index_or_voice or nil)
     local SimpleAudio = get_simple_audio()
 
-    if voice and SimpleAudio and type(SimpleAudio.stop_file) == "function" then
-        pcall(SimpleAudio.stop_file, voice.play_id)
+    if voice and voice.play_id and SimpleAudio and type(SimpleAudio.stop_file) == "function" then
+        local duration = fade_out ~= nil and fade_out or VOICE_REPLACE_FADE_OUT
+        pcall(SimpleAudio.stop_file, voice.play_id, duration)
     end
 
-    remove_active_voice(index)
+    if index then
+        remove_active_voice(index)
+    elseif voice and voice.play_id then
+        remove_active_voice_by_id(voice.play_id)
+    end
 end
 
 local function clear_pending_queue()
@@ -441,12 +448,14 @@ local function start_simple_voice(request, now)
         return false, "playback"
     end
 
+    -- Stop replaced voice in the same replace_group first so its active slot is freed
+    -- before capacity checks run.
+    stop_active_replace_group(request.replace_group)
+
     local room_available, room_error = make_voice_room(request)
     if not room_available then
         return false, room_error
     end
-
-    stop_active_replace_group(request.replace_group)
 
     local ok, play_id = pcall(function()
         return SimpleAudio.play_file(request.path, {
@@ -497,14 +506,9 @@ local function dispatch_request(request, now)
         end
 
         statistics.playback_failed = statistics.playback_failed + 1
-
-        -- Keep the existing compatibility fallback, but only after a native SimpleAudio
-        -- start failure. N网 packages do not have this path and therefore remain SimpleAudio-only.
-        if dispatch_legacy(request) then
-            return true
-        end
-
         statistics.dropped = statistics.dropped + 1
+        -- Never fall back to legacy HTTP player when SimpleAudio is active (e.g. during
+        -- async STATUS_INITIALIZING window), avoiding unwanted external bat launches.
         return false
     end
 
@@ -615,30 +619,30 @@ AudioBackend.update = function(dt)
     end
 
     local dispatched = 0
+    now = current_main_time()
 
-    while dispatched < MAX_DISPATCH_PER_UPDATE and #pending_queue > 0 do
-        now = current_main_time()
-
-        if last_dispatch_time and now - last_dispatch_time < MIN_DISPATCH_INTERVAL then
-            break
-        end
-
-        local request_index = find_next_pending_index()
-        if not request_index then
-            break
-        end
-
-        local request = table.remove(pending_queue, request_index)
-
-        if now - request.created_at > MAX_PENDING_AGE then
-            statistics.dropped = statistics.dropped + 1
-            statistics.dropped_expired = statistics.dropped_expired + 1
-        else
-            last_dispatch_time = now
-            if dispatch_request(request, now) then
-                statistics.dispatched = statistics.dispatched + 1
+    if not (last_dispatch_time and now - last_dispatch_time < MIN_DISPATCH_INTERVAL) then
+        while dispatched < MAX_DISPATCH_PER_UPDATE and #pending_queue > 0 do
+            local request_index = find_next_pending_index()
+            if not request_index then
+                break
             end
-            dispatched = dispatched + 1
+
+            local request = table.remove(pending_queue, request_index)
+
+            if now - request.created_at > MAX_PENDING_AGE then
+                statistics.dropped = statistics.dropped + 1
+                statistics.dropped_expired = statistics.dropped_expired + 1
+            else
+                if dispatch_request(request, now) then
+                    statistics.dispatched = statistics.dispatched + 1
+                end
+                dispatched = dispatched + 1
+            end
+        end
+
+        if dispatched > 0 then
+            last_dispatch_time = now
         end
     end
 end

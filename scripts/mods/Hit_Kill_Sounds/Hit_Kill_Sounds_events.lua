@@ -142,7 +142,7 @@ local function is_kill_feedback_target_excluded(breed_or_nil)
         return true
     end
 
-    return Breed.is_player(breed_or_nil) or Breed.is_prop(breed_or_nil)
+    return Breed.is_player(breed_or_nil) or Breed.is_prop(breed_or_nil) or breed_or_nil.has_scripted_death_sequence == true
 end
 
 local function is_dot_damage_profile(damage_profile, attack_type)
@@ -215,6 +215,45 @@ local function add_bf4_score_feed(breed_or_nil, is_headshot, bf4_feed_eligible, 
 end
 
 local function _scan_cf_assets()
+    local SimpleAudio = get_mod and get_mod("SimpleAudio")
+    if SimpleAudio and type(SimpleAudio.glob) == "function" then
+        local ok, glob_res = pcall(SimpleAudio.glob, "KillSounds/cf/*.wav")
+        if not ok or not glob_res then
+            ok, glob_res = pcall(SimpleAudio.glob, "mods/Hit_Kill_Sounds/audio/KillSounds/cf/*.wav")
+        end
+        local files = nil
+        if ok and type(glob_res) == "table" then
+            if type(glob_res.list) == "function" then
+                local list_ok, list_res = pcall(glob_res.list, glob_res)
+                if list_ok and type(list_res) == "table" then
+                    files = list_res
+                end
+            else
+                files = glob_res
+            end
+        end
+        if files and #files > 0 then
+            local has_boss = false
+            local has_headshot = false
+            for _, rel_path in ipairs(files) do
+                local filename = rel_path:match("([^/\\]+)$") or rel_path
+                if filename == "killsound_cf_boss.wav" then
+                    has_boss = true
+                elseif filename == "cf_headshot.wav" then
+                    has_headshot = true
+                else
+                    local num = tonumber(filename:match("^killsound_cf_(%d+)%.wav$"))
+                    if num and num > CF_KILL_SOUNDS_MAX then
+                        CF_KILL_SOUNDS_MAX = num
+                    end
+                end
+            end
+            if not has_boss then CF_BOSS_SOUND_PATH = nil end
+            if not has_headshot then CF_HEADSHOT_SOUND_PATH = nil end
+            return
+        end
+    end
+
     -- 扫描音效：cwd = binaries 目录，audio 在 ../mods/Hit_Kill_Sounds/audio/
     local lua_io = Mods and Mods.lua and Mods.lua.io
     local scan_ok, handle = pcall(function()
@@ -431,11 +470,16 @@ local function _cf_on_boss_kill(is_headshot, cf_sound_active, cf_icon_active, no
     if not (cf_sound_active or cf_icon_active) then return end
 
     if cf_icon_active then
-        local icon_idx = math.min(math.max(tonumber(inherited_streak_count) or 1, 1), CF_KILL_ICONS_MAX)
-        cf_icon_state.current_icon = cf_icon_tex[icon_idx] or cf_icon_tex[1]
+        local streak = tonumber(inherited_streak_count) or 0
+        if (not inherited_streak_count or streak <= 0) and is_headshot and cf_icon_tex["headshot_gold"] then
+            cf_icon_state.current_icon = cf_icon_tex["headshot_gold"]
+        else
+            local icon_idx = math.min(math.max(streak, 1), CF_KILL_ICONS_MAX)
+            cf_icon_state.current_icon = cf_icon_tex[icon_idx] or cf_icon_tex[1]
+        end
         cf_icon_state.inherited_streak_count = inherited_streak_count
         cf_icon_state.last_event_time = now
-        cf_icon_state.animation_kind = inherited_streak_count and inherited_streak_count > 0 and "upgrade" or "first"
+        cf_icon_state.animation_kind = streak > 0 and "upgrade" or "first"
         cf_icon_state.is_headshot = is_headshot == true
         cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
     end
@@ -502,31 +546,52 @@ local HIT_WWISE_EXACT_EVENTS = {
     ["play_psyker_lightning_bolt_impact_death"] = true,
 }
 
--- 静音模式表（按 setting 状态填充；event_name:match(pattern) 子串匹配）
+-- 静音模式表（按 setting 状态填充；支持空表布尔短路、哈希精确匹配与字面量子串匹配）
 local silenced_patterns = {}
+local has_silenced_patterns = false
+local silenced_exact = {}
+local silenced_substrings = {}
 
 local function rebuild_silenced_patterns()
     for k in pairs(silenced_patterns) do silenced_patterns[k] = nil end
+    for k in pairs(silenced_exact) do silenced_exact[k] = nil end
+    for i = #silenced_substrings, 1, -1 do silenced_substrings[i] = nil end
 
     local hit_off  = not HKS:get("game_hit_sound_enabled")
     local kill_off = not HKS:get("game_kill_sound_enabled")
 
     if hit_off then
-        for _, p in ipairs(HIT_WWISE_PATTERNS) do silenced_patterns[p] = true end
+        for _, p in ipairs(HIT_WWISE_PATTERNS) do
+            silenced_patterns[p] = true
+            if HIT_WWISE_EXACT_EVENTS[p] then
+                silenced_exact[p] = true
+            else
+                silenced_substrings[#silenced_substrings + 1] = p
+            end
+        end
     end
     if kill_off then
-        for _, p in ipairs(KILL_WWISE_PATTERNS) do silenced_patterns[p] = true end
+        for _, p in ipairs(KILL_WWISE_PATTERNS) do
+            silenced_patterns[p] = true
+            silenced_substrings[#silenced_substrings + 1] = p
+        end
     end
+
+    has_silenced_patterns = hit_off or kill_off
 end
 
 local function is_event_silenced(event_name)
+    if not has_silenced_patterns then return false end
     if type(event_name) ~= "string" then return false end
-    local event_basename = event_name:match("([^/]+)$")
-    if not event_basename or not event_basename:match("^play_") then return false end
-    for pattern in pairs(silenced_patterns) do
-        if HIT_WWISE_EXACT_EVENTS[pattern] then
-            if event_basename == pattern then return true end
-        elseif event_name:match(pattern) then
+    if not string.find(event_name, "/play_", 1, true) and string.sub(event_name, 1, 5) ~= "play_" then
+        return false
+    end
+    local event_basename = string.match(event_name, "([^/]+)$")
+    if event_basename and silenced_exact[event_basename] then
+        return true
+    end
+    for i = 1, #silenced_substrings do
+        if string.find(event_name, silenced_substrings[i], 1, true) then
             return true
         end
     end
@@ -779,6 +844,8 @@ local HIT_SOUNDS = {
     },
 }
 
+local BFV_HEADSHOT_ADD_SOUND = "KillSounds/BFV/killsound_bfv_headshotadd.wav"
+
 local KILL_SOUNDS = {
     BF1 = {
         normal = {
@@ -848,8 +915,8 @@ local KILL_SOUNDS = {
             "KillSounds/BFV/killsound_bfv_headshot8.wav",
             "KillSounds/BFV/killsound_bfv_headshot9.wav",
             "KillSounds/BFV/killsound_bfv_headshot10.wav",
-            "KillSounds/BFV/killsound_bfv_headshotadd.wav",
         },
+        headshot_add = BFV_HEADSHOT_ADD_SOUND,
     },
     CODBO6 = {
         normal = {
@@ -1053,6 +1120,18 @@ local function play_kill_sound(is_headshot)
         local sound_kind = is_headshot and "kill_headshot" or "kill_normal"
 
         queue_sound(sound_file, track, volume, priority, sound_kind)
+
+        -- BFV 原版爆头双层混音：钢盔穿透瞬态脆响 (headshot1..10) + 低频金属共鸣尾音 (BFV_HEADSHOT_ADD_SOUND)
+        if game == "BFV" and is_headshot and not use_normal_sound and BFV_HEADSHOT_ADD_SOUND then
+            queue_sound(
+                BFV_HEADSHOT_ADD_SOUND,
+                TRACKS.KILL_NORMAL,
+                volume,
+                AUDIO_PRIORITY.KILL,
+                "kill_headshot_add",
+                "bfv_headshot_add"
+            )
+        end
     end
 end
 
@@ -1066,7 +1145,7 @@ local function can_play_hit()
 end
 
 -- 处理攻击结果的内部函数
-local function handle_attack_result(damage_profile, attacked_unit, attacking_unit, attack_direction, hit_world_position, hit_weakspot, damage, attack_result, attack_type, damage_efficiency, is_critical_strike)
+local function handle_attack_result(damage_profile, attacked_unit, attacking_unit, _attack_direction, _hit_world_position, hit_weakspot, damage, attack_result, attack_type, _damage_efficiency, _is_critical_strike)
     -- 总开关关闭时静默
     if not HKS:get("enabled") then
         return
@@ -1165,17 +1244,18 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
         -- BF4 uses a pure preview to build the complete batch.  The counter is
         -- accepted only after the batch has been inserted successfully.
-        local bf4_eligible = killstreak_enabled and ScoreFeed and ScoreFeed.is_enabled and
-            ScoreFeed.is_enabled() and bf4_feed_target_valid
-        local bf4_next_count = bf4_eligible and bf4_feed_counter and
-            bf4_feed_counter.preview_next and bf4_feed_counter:preview_next(now)
+        local bf4_eligible = ScoreFeed and ScoreFeed.is_enabled and
+            ScoreFeed.is_enabled() and bf4_feed_target_valid and
+            dot_icon_allowed and companion_kill_icon_allowed
+        local bf4_next_count = (killstreak_enabled and bf4_eligible and bf4_feed_counter and
+            bf4_feed_counter.preview_next) and bf4_feed_counter:preview_next(now) or nil
         local bf4_event_added = add_bf4_score_feed(
             breed_or_nil,
             is_kill_headshot,
             bf4_eligible,
             bf4_next_count
         )
-        if bf4_event_added then
+        if bf4_event_added and killstreak_enabled then
             accept_counter(bf4_feed_counter, now, true)
         end
 
@@ -1314,5 +1394,6 @@ HKS.HitKillSoundsEvents.clear_cf_icon_state = clear_cf_icon_state
 HKS.HitKillSoundsKillstreakStates = killstreak_counters
 HKS.HitKillSoundsCFIconState = cf_icon_state
 HKS.HitKillSoundsCFState = cf_icon_state
+HKS.HitKillSoundsCFIconTex = cf_icon_tex
 
 return HKS.HitKillSoundsEvents

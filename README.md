@@ -2,7 +2,7 @@
 
 一个暗潮 (Darktide) MOD，可以在命中或击杀敌人时播放来自不同游戏的命中和击杀音效，并显示动态击杀图标。
 
-当前版本：v1.5.0
+当前版本：v1.5.1
 
 ## 功能特点
 
@@ -164,6 +164,23 @@ v1.2 起，MOD 默认使用 SimpleAudio 播放 `audio/HitSounds`、`audio/KillSo
 本 MOD 仅供教育和个人使用。所有音效文件和图标版权归其各自版权持有人所有。
 
 ## 更新日志
+
+### v1.5.1
+- **战地 5（BFV）原版视听还原与离场修复**：
+  - 分离 `killsound_bfv_headshotadd.wav`（2.077s 低频金属共振尾音）与 `headshot1~10.wav`（钢盔瞬态脆响），在爆头击杀时以 0ms 相位差同帧双轨并发触发，并为共振尾音绑定 `bfv_headshot_add` 替换组防止占满音轨池。
+  - 修复 `_leaving_slots` 透明度与缩放每帧对自身累乘衰减导致的瞬间坍缩问题，以及同帧 >10 杀溢出时 `render_alpha = 0` 导致的 Lua `0 or 1` 隐身陷阱。
+  - 还原 BFV 入场 Cubic Ease-Out（`1.85 -> 1.0`）垂直砸落（单图标正中砸落、多图标右侧 `+28 * scale` 切入）、爆头圆环 Quartic Ease-Out（`0.85 -> 2.8`）底层（`z = -1`）冲击波，以及自然淡出前 30% 水平微收拢 + 后 70% 平滑微缩（`1.0 -> 0.88`）平方淡出曲线。
+- **穿越火线（CF）视觉比例归一化与动效升级**：
+  - 新增 `GOLD_HEADSHOT_TEX_SCALE = 0.75`，消除 `headshot_gold.png`（100% 满画布）与 `kill1~6.png`（65.2%×74.2% 画布占比）之间的视觉尺寸断层；恢复无连杀时爆头击杀 Boss 显示黄金骷髅图标。
+  - 还原 CF 首杀重锤砸落（`2.15 -> 0.92 -> 1.0` + Alpha `0.25 -> 1.0`）、连杀升级二段弹性脉冲（`0.82 -> 1.28 -> 1.0`）、末端微扩消散（`1.0 -> 1.08`），并新增底层 `afterimage` 扩散残影图层（`1.0x -> 1.65x`）。
+- **战地 4（BF4）错峰揭示时序与右侧独立总分栏**：
+  - 新增 `refresh_visible_targets` 与 `trigger_tally_roll`：修复错峰词条（`reveal_at`）在等待期提前滑完动画及首行悬空出生的问题，保留旧词条平滑上推过渡，并固定总分滚表插值起点 `roll_start_score`。
+  - 移除 `- event_pass_width` 造成的 32px 空白漏洞，将累计总分移至右侧独立分栏（`base_x + 88 * scale`，左对齐），彻底消除多行文字与总分重叠及总分上下跳动问题。
+- **音频后端、前置库集成与 HUD 性能优化**：
+  - `Hit_Kill_Sounds_audio_backend.lua`：先执行 `stop_active_replace_group` 释放旧音轨再执行 `make_voice_room`；将 `MIN_DISPATCH_INTERVAL` 移至同帧派发循环外；为 `stop_active_voice` 启用 `SimpleAudio.stop_file(play_id, 0.025)` 25ms 微淡出消除截断爆音；禁止 `using_simple_audio == true` 时误回退 Legacy 进程。
+  - `Hit_Kill_Sounds_bgm.lua`：停止播放启用 `0.4s` 平滑淡出，并增加前 5 次失败每隔 0.5s 的异步初始化重试保护。
+  - `Hit_Kill_Sounds_events.lua`：优先使用 `SimpleAudio.glob` 极速扫描 CF 音效资产；重构 `is_event_silenced` 增加 `has_silenced_patterns` 空表 $O(1)$ 短路与 `string.find` 字面量匹配；补充 `has_scripted_death_sequence` 过滤并解耦 `bf4_eligible` 与 `killstreak_enabled`。
+  - 三大 HUD 元素增加闲置期 `update`/`draw` 短路、BF4 `_text_size` 宽度缓存、纹理加载重试保护，并将 `visibility_groups` 扩充至包含 `player_in_danger_zone`、`communication_wheel`、`emote_wheel` 与 `tactical_overlay`。
 
 ### v1.5.0
 - **BFV 生命周期与队列修复**：保留 10 个主图标，第 11 个才淘汰最旧项；离场副本有界，队列对称排布、间距按缩放计算，入场、爆头环、自然淡出和溢出挤出均按经过时间驱动。

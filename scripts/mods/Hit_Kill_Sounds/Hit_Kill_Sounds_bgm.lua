@@ -10,6 +10,9 @@ local WWISE_GAME_SYNC_MANAGER_PATH = "scripts/managers/wwise_game_sync/wwise_gam
 local LIVE_VOLUME_DECAY = 0.01
 local LIVE_VOLUME_MIN_DISTANCE = 0
 local LIVE_VOLUME_MAX_DISTANCE = 100
+local STOP_FADE_OUT_DURATION = 0.4
+local MAX_INIT_RETRIES = 5
+local INIT_RETRY_INTERVAL = 0.5
 
 local BGM_FILES = {
     "Lobby_BGM1.mp3",
@@ -43,6 +46,9 @@ local files_valid
 local warnings = {}
 local saved_native_music_state
 local volume_update_pending = false
+local bgm_clock = 0
+local init_retry_count = 0
+local retry_after_clock = 0
 
 local function warn_once(key, message)
     if warnings[key] then
@@ -330,7 +336,7 @@ local function stop_playback_only()
 
     local SimpleAudio = get_simple_audio()
     if active_play_id and SimpleAudio and type(SimpleAudio.stop_file) == "function" then
-        pcall(SimpleAudio.stop_file, active_play_id)
+        pcall(SimpleAudio.stop_file, active_play_id, STOP_FADE_OUT_DURATION)
     end
 end
 
@@ -392,6 +398,12 @@ local function play_track(index)
     end)
 
     if not ok or not valid_play_id(new_play_id) then
+        init_retry_count = init_retry_count + 1
+        if init_retry_count <= MAX_INIT_RETRIES then
+            retry_after_clock = bgm_clock + INIT_RETRY_INTERVAL
+            return false
+        end
+
         block_playback(
             "play_failed",
             "[Hit_Kill_Sounds] Custom Mourningstar BGM playback failed for "
@@ -401,6 +413,8 @@ local function play_track(index)
         return false
     end
 
+    init_retry_count = 0
+    retry_after_clock = 0
     play_id = new_play_id
     previous_index = current_index
     current_index = index
@@ -525,10 +539,12 @@ BGM.init = function()
     end
 end
 
-BGM.update = function(_dt)
+BGM.update = function(dt)
     if not initialized then
         return
     end
+
+    bgm_clock = bgm_clock + math.max(tonumber(dt) or 0, 0)
 
     local game_mode_name = get_game_mode_name()
     if game_mode_name ~= last_mode then
@@ -537,6 +553,8 @@ BGM.update = function(_dt)
         end
 
         playback_blocked = false
+        init_retry_count = 0
+        retry_after_clock = 0
         last_mode = game_mode_name
 
         if files_valid == false then
@@ -597,6 +615,10 @@ BGM.update = function(_dt)
     end
 
     if not play_id then
+        if bgm_clock < retry_after_clock then
+            return
+        end
+
         local next_index = choose_next_index()
         if not next_index then
             block_playback(
@@ -636,6 +658,8 @@ BGM.on_setting_changed = function(setting_id)
 
     if setting_id == "enabled" or setting_id == "lobby_bgm_enabled" then
         playback_blocked = false
+        init_retry_count = 0
+        retry_after_clock = 0
 
         if should_run() then
             BGM.update(0)
@@ -650,6 +674,8 @@ BGM.shutdown = function()
     generation = generation + 1
     initialized = false
     last_mode = nil
+    init_retry_count = 0
+    retry_after_clock = 0
 end
 
 HKS.HitKillSoundsBGM = BGM
