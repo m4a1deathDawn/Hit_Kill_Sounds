@@ -1061,29 +1061,31 @@ local function play_hit_sound(is_headshot, is_melee)
     end
     local volume = HKS:get("hit_volume") or 100
     local sound_type = is_headshot and "headshot" or "normal"
-    local sounds = HIT_SOUNDS[game]
-
-    if not sounds then
-        HKS:warning("Hit_Kill_Sounds: 未找到游戏 " .. game .. " 的命中音效")
-        return
-    end
-
-    local sound_list = sounds[sound_type]
-    if not sound_list or #sound_list == 0 then
-        sound_list = sounds.normal
-        if not sound_list or #sound_list == 0 then
-            return
+    local sound_file
+    if game == "CUSTOM" then
+        local custom = HKS.HitKillSoundsCustomAudio
+        sound_file = custom and custom.sample("hit", sound_type == "headshot", HIT_SOUNDS.BFV)
+    else
+        local sounds = HIT_SOUNDS[game]
+        if not sounds then
+            HKS:warning("Hit_Kill_Sounds: 未找到游戏 " .. tostring(game) .. " 的命中音效")
+            return false
         end
+        local sound_list = sounds[sound_type]
+        if not sound_list or #sound_list == 0 then
+            sound_list = sounds.normal
+        end
+        sound_file = get_random_sound(sound_list)
     end
 
-    local sound_file = get_random_sound(sound_list)
     if sound_file then
         local track = is_headshot and TRACKS.HIT_HEADSHOT or TRACKS.HIT_NORMAL
         local priority = is_headshot and AUDIO_PRIORITY.HEADSHOT_HIT or AUDIO_PRIORITY.HIT
         local sound_kind = is_headshot and "hit_headshot" or "hit_normal"
 
-        queue_sound(sound_file, track, volume, priority, sound_kind)
+        return queue_sound(sound_file, track, volume, priority, sound_kind) == true
     end
+    return false
 end
 
 local function play_kill_sound(is_headshot)
@@ -1098,22 +1100,23 @@ local function play_kill_sound(is_headshot)
     end
     local volume = get_kill_volume(is_headshot)
     local sound_type = is_headshot and not use_normal_sound and "headshot" or "normal"
-    local sounds = KILL_SOUNDS[game]
-
-    if not sounds then
-        HKS:warning("Hit_Kill_Sounds: 未找到游戏 " .. game .. " 的击杀音效")
-        return
-    end
-
-    local sound_list = sounds[sound_type]
-    if not sound_list or #sound_list == 0 then
-        sound_list = sounds.normal
-        if not sound_list or #sound_list == 0 then
+    local sound_file
+    if game == "CUSTOM" then
+        local custom = HKS.HitKillSoundsCustomAudio
+        sound_file = custom and custom.sample("kill", sound_type == "headshot", KILL_SOUNDS.BFV)
+    else
+        local sounds = KILL_SOUNDS[game]
+        if not sounds then
+            HKS:warning("Hit_Kill_Sounds: 未找到游戏 " .. tostring(game) .. " 的击杀音效")
             return
         end
+        local sound_list = sounds[sound_type]
+        if not sound_list or #sound_list == 0 then
+            sound_list = sounds.normal
+        end
+        sound_file = get_random_sound(sound_list)
     end
 
-    local sound_file = get_random_sound(sound_list)
     if sound_file then
         local track = is_headshot and not use_normal_sound and TRACKS.KILL_HEADSHOT or TRACKS.KILL_NORMAL
         local priority = is_headshot and AUDIO_PRIORITY.HEADSHOT_KILL or AUDIO_PRIORITY.KILL
@@ -1138,7 +1141,6 @@ end
 local function can_play_hit()
     local current_time = Managers.time:time("main")
     if current_time - last_hit_time >= HIT_COOLDOWN then
-        last_hit_time = current_time
         return true
     end
     return false
@@ -1347,7 +1349,10 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
 
     if can_play_hit() then
         local is_melee = attack_type == "melee"
-        play_hit_sound(is_weakspot, is_melee)
+        if play_hit_sound(is_weakspot, is_melee) then
+            -- Queue admission, NOT confirmed playback; async drops keep this cooldown.
+            last_hit_time = Managers.time:time("main")
+        end
     end
 end
 

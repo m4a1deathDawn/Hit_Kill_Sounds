@@ -35,6 +35,9 @@ local simple_audio
 local initialized = false
 local manager_hook_installed = false
 local native_music_suppressed = false
+local native_restore_pending = false
+local custom_bgm = false
+local failed_tracks = {}
 local play_id
 local current_index
 local previous_index
@@ -93,7 +96,8 @@ local function is_gameplay_ui_ready()
 end
 
 local function should_run()
-    return HKS:get("enabled") ~= false
+    return (type(HKS.is_enabled) ~= "function" or HKS:is_enabled())
+        and HKS:get("enabled") ~= false
         and HKS:get("lobby_bgm_enabled") == true
         and is_hub()
 end
@@ -185,28 +189,21 @@ local function valid_play_id(value)
 end
 
 local function choose_next_index()
-    local count = #BGM_PATHS
-
-    if count == 0 then
-        return nil
-    end
-
-    if count == 1 then
-        return 1
-    end
-
+    local candidates = {}
     local excluded_index = current_index or previous_index
-    if not excluded_index then
-        return math.random(count)
+    for index = 1, #BGM_PATHS do
+        if not failed_tracks[index] then
+            candidates[#candidates + 1] = index
+        end
     end
-
-    local index = math.random(count - 1)
-
-    if index >= excluded_index then
-        index = index + 1
+    if #candidates > 1 and excluded_index then
+        for i = #candidates, 1, -1 do
+            if candidates[i] == excluded_index then
+                table.remove(candidates, i)
+            end
+        end
     end
-
-    return index
+    return #candidates > 0 and candidates[math.random(#candidates)] or nil
 end
 
 local function official_music_zone_state()
@@ -260,10 +257,6 @@ local function official_music_zone_state()
 end
 
 local function restore_native_music()
-    if not Wwise or type(Wwise.set_state) ~= "function" then
-        return false
-    end
-
     local zone_state = official_music_zone_state() or saved_native_music_state
     if not zone_state then
         return false
@@ -271,15 +264,16 @@ local function restore_native_music()
 
     local wwise_game_sync = Managers and Managers.wwise_game_sync
     if wwise_game_sync and type(wwise_game_sync._set_state) == "function" then
-        local ok = pcall(function()
+        pcall(function()
             wwise_game_sync:_set_state(MUSIC_ZONE_GROUP, zone_state)
         end)
-
-        if ok then
-            return true
-        end
     end
 
+    -- _set_state skips cached values. Direct muting did not change that cache,
+    -- so a successful manager call alone does NOT prove native music was restored.
+    if not Wwise or type(Wwise.set_state) ~= "function" then
+        return false
+    end
     local ok = pcall(function()
         Wwise.set_state(MUSIC_ZONE_GROUP, zone_state)
     end)
@@ -291,11 +285,12 @@ local function release_native_music()
     local was_suppressed = native_music_suppressed
     native_music_suppressed = false
 
-    if not was_suppressed then
+    if not was_suppressed and not native_restore_pending then
         return true
     end
 
     local restored = restore_native_music()
+    native_restore_pending = not restored
     if not restored then
         warn_once(
             "restore_failed",
@@ -321,7 +316,8 @@ local function mute_native_music()
     end)
 
     if not ok then
-        native_music_suppressed = false
+        -- A native call can fail after side effects; do not discard restoration state.
+        release_native_music()
     end
 
     return ok
@@ -344,7 +340,7 @@ local function block_playback(key, message)
     playback_blocked = true
     warn_once(key, message)
 
-    if native_music_suppressed then
+    if native_music_suppressed or native_restore_pending then
         release_native_music()
     end
 end
@@ -353,7 +349,8 @@ local function play_track(index)
     local SimpleAudio = get_simple_audio()
     local path = BGM_PATHS[index]
 
-    if not SimpleAudio or type(SimpleAudio.play_file) ~= "function" then
+    if not SimpleAudio or type(SimpleAudio.play_file) ~= "function"
+        or type(SimpleAudio.stop_file) ~= "function" then
         block_playback(
             "simple_audio_missing",
             "[Hit_Kill_Sounds] Custom Mourningstar BGM is disabled because "
@@ -398,6 +395,21 @@ local function play_track(index)
     end)
 
     if not ok or not valid_play_id(new_play_id) then
+        -- Never leave native music suppressed while waiting for another attempt.
+        release_native_music()
+        if custom_bgm then
+            failed_tracks[index] = true
+            warn_once("custom_track_" .. index, "[Hit_Kill_Sounds] UserAudio BGM failed: " .. path)
+            if choose_next_index() then
+                retry_after_clock = bgm_clock + INIT_RETRY_INTERVAL
+                return false
+            end
+            block_playback(
+                "custom_all_failed",
+                "[Hit_Kill_Sounds] All UserAudio BGM tracks failed; official music was left/restored."
+            )
+            return false
+        end
         init_retry_count = init_retry_count + 1
         if init_retry_count <= MAX_INIT_RETRIES then
             retry_after_clock = bgm_clock + INIT_RETRY_INTERVAL
@@ -533,7 +545,23 @@ BGM.init = function()
     install_music_state_hook()
     install_music_event_hook()
 
-    files_valid = validate_bgm_files()
+    local custom = HKS.HitKillSoundsCustomAudio
+    local paths = custom and custom.get_bgm_paths() or {}
+    custom_bgm = #paths > 0
+    failed_tracks = {}
+    if custom_bgm then
+        BGM_PATHS = {}
+        for i, path in ipairs(paths) do
+            BGM_PATHS[i] = path
+        end
+    else
+        BGM_PATHS = {}
+        for i, filename in ipairs(BGM_FILES) do
+            BGM_PATHS[i] = "mods/Hit_Kill_Sounds/audio/BGM/" .. filename
+        end
+    end
+    -- Custom paths were already validated at startup. No manifest/track disk I/O in update/callbacks.
+    files_valid = custom_bgm or validate_bgm_files()
     if files_valid == false then
         playback_blocked = true
     end
@@ -545,6 +573,9 @@ BGM.update = function(dt)
     end
 
     bgm_clock = bgm_clock + math.max(tonumber(dt) or 0, 0)
+    if native_restore_pending then
+        release_native_music()
+    end
 
     local game_mode_name = get_game_mode_name()
     if game_mode_name ~= last_mode then
@@ -553,6 +584,7 @@ BGM.update = function(dt)
         end
 
         playback_blocked = false
+        failed_tracks = {}
         init_retry_count = 0
         retry_after_clock = 0
         last_mode = game_mode_name
@@ -563,7 +595,7 @@ BGM.update = function(dt)
     end
 
     if not should_run() then
-        if play_id or native_music_suppressed then
+        if play_id or native_music_suppressed or native_restore_pending then
             stop_bgm(true)
         end
 
@@ -658,6 +690,7 @@ BGM.on_setting_changed = function(setting_id)
 
     if setting_id == "enabled" or setting_id == "lobby_bgm_enabled" then
         playback_blocked = false
+        failed_tracks = {}
         init_retry_count = 0
         retry_after_clock = 0
 

@@ -1,82 +1,64 @@
 # Hit/Kill Sounds
 
-A Darktide mod that plays hit and kill sounds from various games when you damage or kill enemies, and displays dynamic kill icons.
+Add hit sounds, kill sounds and kill icons inspired by several games to Warhammer 40,000: Darktide. Optional features include CrossFire killstreak announcements, a Battlefield 4-style text feed and score tally, and Mourningstar hub BGM.
 
-Current version: v1.5.1
+**Current version: v1.5.2**
 
-## Features
+## Installation and Quick Start
 
-- **Hit Sounds**: Play different sounds when hitting enemies (normal hit vs weakspot hit)
-- **Kill Sounds**: Play different sounds when killing enemies (normal kill vs headshot kill)
-- **Dynamic Kill Icons**: Queue-based kill icon system supporting consecutive kill accumulation
-- **Random Selection**: Multiple sound variants for each type, randomly selected
-- **Sound Cooldown**: Prevents sound spam from fast-firing weapons
-- **Deduplication**: Prevents duplicate sounds in multiplayer mode
-- **DoT Support**: Optional hit sounds for damage-over-time effects (bleed, burn, etc.)
-- **Target Filtering**: Filter sounds to only play for specific enemy types (Elite, Special, Boss)
-- **Volume Control**: Adjust volume independently for hit and kill sounds (0-100)
-- **Icon Customization**: Adjust icon size, color, horizontal/vertical position, and display duration
-- **Multiplayer Support**: Works correctly in both single-player and multiplayer modes
-- **CF-style streak output** (v1.1): CrossFire-themed streak sound + icon system, plays sounds in indexed order based on streak count, switchable style
-- **Style Switch** (v1.1): Toggle between "Battlefield 5 queue-based icon" and "CrossFire killstreak-style icon"
-- **Decoupled CF Sound & Icon** (v1.1): CrossFire killstreak sound is independently toggleable from icon style, supporting 4 combinations (CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5)
-- **SimpleAudio + SimpleAssets backend** (v1.2): Audio now plays through SimpleAudio by default, and icon textures load through SimpleAssets by default, with no external player executable required
-- **CODBO7 kill sounds** (v1.3): Normal kills randomly use three variants and headshot kills use a dedicated file; CODBO7 is available only in kill-source dropdowns
-- **Custom Mourningstar BGM** (v1.3): Optionally play six local MP3 tracks in the normal `hub` and adjust their volume independently
-- **Generic killstreak mechanism and burst-playback protection** (v1.35): BF4 text, CF sound, and CF icon each maintain an independent streak counter, while SimpleAudio uses a bounded queue, frame-spread dispatch, and a multi-voice pool
-- **Battlefield 4-style text kill feed and independent score tally** (v1.4): Fixed-slot HUD text and cumulative score output, independent of BF5/CF sound and icon switches
-- **Independent output counters** (v1.4.2): BF4, CF sound, and CF icon use separate counters, so different filters may produce different streak numbers
-- **v1.5 BFV/CF/BF4 update**: Added bounded BFV 10+2 icon lifecycle handling and time-based animation, valid CF streak inheritance/fade and numeric announcement replacement, BF4 multikill scoring, an independent cumulative-total display, and non-overlapping feed layout, plus an independent melee kill-sound switch.
+1. Make sure DML (the Mod Loader) and DMF (the Mod Framework) are installed and enabled.
+2. Install and enable the dependencies: **SimpleAudio** plays audio, and **SimpleAssets** loads icons.
+3. Put the entire Hit_Kill_Sounds folder in the game's mods directory, alongside SimpleAudio and SimpleAssets.
+4. Enable these mods in mods/mod_load_order.txt, placing SimpleAudio and SimpleAssets before Hit_Kill_Sounds.
+5. Start the game, open **Hit/Kill Sounds** in the Mod settings, check that the master switch is enabled, then choose your sound sources and icon style.
 
-## Kill Icons
+For a first check, keep the default BF1 sources and confirm that hit and kill sounds work. Hub BGM and the Battlefield 4 text feed are disabled by default; enable them when needed.
 
-Major rewrite in v0.9!
+## Features and Common Settings
 
-- **Queue System**: Up to 10 kill icons displayed simultaneously, new kills push old icons left
-- **Entry Animation**: Icons slide in from right side to center (ease-out, 0.3s)
-- **Normal Kill**: Entry scale 1.8→1.0 (ease-out), display then fade out
-- **Headshot Kill**: Same as normal + circle shockwave effect (scale 1→3, alpha fade)
-- **Exit Animation**: Slide left and fade out (ease-out, 0.2s)
-- **Adjustable Parameters**:
-  - Icon toggle
-  - Icon size (0.5x - 2.0x)
-  - Icon transparency (0% - 100%)
-  - Normal icon color (RGB)
-  - Headshot icon color (RGB)
-  - Horizontal position (0=left, 50=center, 100=right)
-  - Vertical position (0=top, 100=bottom)
-  - Display duration (1.0s - 3.0s)
+| What you want to change | Where to look | Notes |
+| --- | --- | --- |
+| Normal and weakspot hit sounds | Hit Sound Settings | Choose the two sources separately; both use hit volume |
+| Normal and weakspot melee hit sounds | Hit Sound Settings | Enable melee hit sounds, then choose their sources |
+| Normal and headshot kill sounds | Kill Sound Settings | Choose separate sources and adjust their respective volumes |
+| Melee kill sounds | Kill Sound Settings | An independent switch lets you mute melee kill sounds while keeping icons |
+| DoT, companion and target filters | The relevant sound or icon settings | Damage-over-time, companion feedback and eligible targets have separate controls |
+| The game's original hit and kill sounds | Hit or Kill Sound Settings | Keep or mute the original game feedback |
+| BFV and CF kill icons | Kill Icon Settings | Adjust style, size, opacity, position and other options |
+| CF killstreak announcements | Kill Sound Settings | Enable CF announcements and the general killstreak mechanism |
+| BF4 text feed | Battlefield 4-style Text Kill Feed | Enable the general killstreak mechanism, then the text feed |
+| Mourningstar hub BGM | Custom Mourningstar BGM | Disabled by default; regular hub only |
+| Your own hit and kill sounds | The corresponding source dropdown | Choose Custom Audio Pack and put files in UserAudio |
 
-Icon assets: Battlefield V kill icons
+Hit sounds, kill sounds and kill icons can be enabled independently. Normal, weakspot and melee hits still share one hit cooldown. Choosing Custom does not bypass target, DoT, companion, melee or volume settings.
 
-## CF (CrossFire) Killstreak System
+### BFV Kill Icons
 
-New in v1.1! A CrossFire-themed killstreak system ported from the EBuyToDeep_KillFeedBack mod, complementing the default "Battlefield 5 queue-based icon" system.
+The BFV style queues kill icons and moves existing icons when a new kill arrives. It uses 10 main slots and up to 2 leaving-transition slots, with entry, headshot ring and fade animations.
 
-- **Indexed killstreak sounds**: Plays `killsound_cf_01..09.wav` in order (1→2→…→9→wraps), unlike the random-play behavior of normal kill sounds
-- **Indexed killstreak icons**: Cycles through `kill1..6.png` + a dedicated gold `headshot_gold.png` for first-kill headshots
-- **Dedicated boss sound**: Killing monster-tagged enemies plays `killsound_cf_boss.wav`
-- **Style switch**: Select "CrossFire Style" in the Style dropdown at the top of Kill Icon Settings
-- **Adjustable parameters**:
-  - Killstreak max count (10-30, default 13; each counter wraps independently)
-  - BF4 text target (`bf4_feed_target`), CF sound target (`kill_target`), and CF icon target (`kill_icon_target`)
-  - Icon transparency, size, vertical/horizontal position
-  - Counter reset time (1.0s-3.0s, default 2.0s; controls both the killstreak reset window and the icon display duration)
-- **Decoupled sound & icon**: The "Enable CF Kill Sound" toggle in Kill Sound Settings is independent of icon style — supports 4 combinations: CF sound + BF5 icon, BF5 sound + CF icon, CF+CF, BF5+BF5
-- **Independent target semantics**: `bf4_feed_target` controls only BF4 text events, `kill_target` controls only CF/BF5 kill sounds, and `kill_icon_target` controls only CF/BF5 kill icons; `killstreak_target` has been removed and old saved values are ignored
+Adjust size, opacity, normal/headshot colors, horizontal/vertical position and display duration. Size ranges from 0.5 to 2.0 times the base size; display duration ranges from 1.0 to 3.0 seconds.
 
-Icon assets: CrossFire killstreak icons
+### CF Killstreak Sounds and Icons
 
-## Battlefield 4-style Text Kill Feed (v1.4)
+CF sounds and CF icons can be enabled separately. For example, combine CF announcements with BFV icons, or ordinary kill sounds with CF icons.
 
-Enable `bf4_feed_enabled` in the **Battlefield 4-style Text Kill Feed** settings group to display a borderless, background-free HUD text feed. It is disabled by default and requires `killstreak_enabled` to be enabled in General Settings.
+- Normal killstreak announcements select the numbered sound for the current count. Above the available sound tiers, the highest tier is reused until the count times out or wraps at the configured limit.
+- Icons advance through the available tiers and keep the highest tier beyond that. A first-kill headshot can display the gold headshot icon.
+- Boss kills can trigger dedicated feedback but do not increase the ordinary killstreak count.
+- The killstreak limit defaults to 13 and ranges from 10 to 30. The reset time defaults to 2.0 seconds and ranges from 1.0 to 3.0 seconds.
+- When CF killstreak sounds are active, their existing priority rules replace the ordinary source sound for that kill. Choosing Custom does not override this behavior.
 
-- Normal kill 100, headshot bonus 50, elite kill 200, special kill 250, Boss kill 500
-- A headshot special kill displays both `HEADSHOT BONUS` and `SPECIAL KILLED`, while adding 300 to the tally once
-- The newest event is at the bottom; event text is right-aligned, scores are left-aligned, and the cumulative tally stays above/right of the feed with a short punch animation
-- Supports target filtering, 1.0-3.0 second display duration, horizontal/vertical position, and 50%-150% text scale
-- The feature does not depend on CF/BF5 sound or icon switches and does not trigger the official Combat Feed event. The native game feed may show duplicate information if it is enabled at the same time
-- Disabling the feed or the killstreak mechanism immediately clears the text slots and tally without changing saved settings
+The BF4 text feed, CF sounds and CF icons each maintain their own counter and target filter. Their counts can differ and do not need to stay synchronized.
+
+### BF4 Text Feed and Score Tally
+
+Enable the killstreak mechanism in General Settings, then enable the Battlefield 4-style Text Kill Feed. It displays borderless kill messages, bonus values and an accumulated tally, independently of sound and icon switches.
+
+- Normal kills award 100 display points, elites 200, specials 250 and Bosses 500. Headshots add 50, with additional multikill bonuses supported.
+- For example, a headshot special kill displays both the special-kill message and headshot bonus, totaling 300 before any multikill bonus.
+- Adjust targets, display duration, position and text size. The accumulated tally is displayed beside the feed.
+- These points are for this Mod's HUD only and do not change official mission rewards or results.
+- Disabling the feed or the killstreak mechanism clears its current display. If the game's own kill feed is also enabled, you may see duplicate notifications.
 
 ## Supported Sound Sources
 
@@ -98,72 +80,197 @@ Enable `bf4_feed_enabled` in the **Battlefield 4-style Text Kill Feed** settings
 | Call of Duty: Warzone 2 | 1 | → normal | 2 variants | → normal |
 | Delta Force | 1 | → normal | 1 | 1 |
 | Apex Legends | 8 variants | → normal | 1 | → normal |
+| Custom Audio Pack | Up to 20 | Up to 20 | Up to 20 | Up to 20 |
 
-*`→ normal` indicates the game source has no dedicated headshot files; the mod falls back to that source's normal pool so every headshot still produces feedback.*
+“→ normal” means the source has no dedicated headshot sound and uses its normal pool. “—” means the option is unavailable. CODBO7 appears only in kill-source dropdowns.
 
-## How It Works
+## Custom Hit and Kill Sounds (UserAudio)
 
-This mod hooks `AttackReportManager:add_attack_result` to capture attack events:
+**No Lua editing is needed.** Replace a default WAV for a simple setup, or edit a playlist to use several sounds. All paths below are relative to the Hit_Kill_Sounds folder.
 
-- Intercept player damage/kill events
-- Determine if it's a hit (normal/weakspot) or kill (normal/headshot)
-- Apply target filtering based on enemy type
-- Play the appropriate local sound through SimpleAudio
-- Call HUD system to display kill icons
-- Submit a separate BF4 text-feed batch for each valid kill and update an independent score tally without triggering the official Combat Feed event
+### Where to Put Files
 
-Starting with v1.2, audio playback uses SimpleAudio by default, and icon textures use SimpleAssets by default. The old HTTP player adapter is still kept as a compatibility fallback, but Nexus Mods release packages can omit the `bin` folder.
+~~~text
+UserAudio/
+├─ README_自定义音频.txt      Chinese plain-text guide
+├─ README_Custom_Audio.txt  English plain-text guide
+├─ BGM/
+│  └─ tracks.txt            BGM playlist; comments only by default
+├─ Hit/
+│  ├─ Normal.wav           Default normal hit
+│  ├─ Headshot.wav         Default weakspot hit
+│  ├─ normal/              Optional additional normal hits
+│  ├─ headshot/            Optional additional weakspot hits
+│  └─ playlist.txt         Hit playlist
+└─ Kill/
+   ├─ Normal.wav           Default normal kill
+   ├─ Headshot.wav         Default headshot kill
+   ├─ normal/              Optional additional normal kills
+   ├─ headshot/            Optional additional headshot kills
+   └─ playlist.txt         Kill playlist
+~~~
 
-The kill icon system preloads textures through SimpleAssets and manages a queue of 10 slots. New kills trigger entry animations that push old icons left.
+The four default WAVs are direct copies of BFV sounds already included in this Mod. Replace these copies as desired. No UserAudio BGM placeholder is bundled, and the original files under audio remain available.
 
-## Custom Mourningstar BGM (v1.3)
+### Method 1: Replace a Default WAV
 
-Enable `lobby_bgm_enabled` in the **Custom Mourningstar BGM** settings group to play
-`audio/BGM/Lobby_BGM1.mp3` through `Lobby_BGM6.mp3`, but only when
-`Managers.state.game_mode:game_mode_name() == "hub"`. A track is selected randomly on hub entry, and the next track is selected from the other files when playback finishes.
+1. Fully exit the game and copy the default file you want to replace to a safe personal location.
+2. Use an audio editor to export your sound as a real WAV file.
+3. Overwrite the corresponding Normal.wav or Headshot.wav under Hit or Kill, keeping its name and location. The default SFX playlists are already filled in; no playlist editing is required.
+4. Start the game and select **Custom Audio Pack** in the appropriate source dropdown. The six selectors cover normal hit, weakspot hit, normal melee hit, weakspot melee hit, normal kill and headshot kill; each can be changed separately.
+5. Check the master switch, the relevant sound switch and volume. Melee hits also require the melee hit switch.
 
-- Disabled by default; it does not run in missions, the main menu, training grounds, the shooting range, or `prologue_hub`
-- `lobby_bgm_volume` ranges from 0 to 100 in steps of 5; changing it during playback updates the active playback instance without restarting the track
-- Requires **SimpleAudio** `play_file` and uses `audio_type = "music"`, so master and music volume settings still apply
-- The mod only attempts to take over native hub music after a dedicated `play_id` is returned; missing SimpleAudio, missing files, or playback failure leave native music unchanged
+**Format:** Phase-one SFX support is WAV only. PCM 16-bit, 48 kHz, mono or stereo is recommended. Renaming an MP3 to .wav is not conversion; compatibility with other WAV encodings depends on actual playback.
 
-## Installation
+In Windows Explorer, enable **View → Show → File name extensions** to avoid names such as Normal.wav.wav or playlist.txt.txt.
 
-1. Install and enable the required mods: SimpleAudio and SimpleAssets
-2. Download this mod and place `Hit_Kill_Sounds` next to `SimpleAudio` and `SimpleAssets` in your Darktide `mods` folder
-3. Enable this mod in the game's mod menu
-4. Configure sound sources, volumes, and kill icon options; enable **Custom Mourningstar BGM** if you want the optional hub music
+### Method 2: Add Several Sounds Through a Playlist
 
-## Requirements
+Put audio files inside UserAudio, then edit the matching playlist.txt with Notepad. Paths start at the UserAudio root and must have a normal or headshot label; folder names do not determine the category.
 
-- Darktide with mod support enabled
-- SimpleAudio
-- SimpleAssets
+Hit playlist, UserAudio/Hit/playlist.txt:
 
-## Sound & Asset Sources
+~~~text
+# type|relative path from UserAudio
+normal|Hit/Normal.wav
+normal|Hit/normal/metal_01.wav
+headshot|Hit/Headshot.wav
+headshot|Hit/headshot/headshot_soft.wav
+~~~
 
-All hit and kill sounds are from their respective games and are used for modding/educational purposes:
+Kill playlist, UserAudio/Kill/playlist.txt:
 
-- Battlefield series sounds and icons from EA/DICE games
-- Call of Duty series sounds from Activision
-- The Finals sounds from Embark Studios
-- Overwatch sounds from Blizzard Entertainment
-- Kill icon assets from EA/DICE Battlefield V
+~~~text
+normal|Kill/Normal.wav
+normal|Kill/normal/kill_01.wav
+headshot|Kill/Headshot.wav
+headshot|Kill/headshot/headshot_01.wav
+~~~
 
-## Acknowledgments
+The extra filenames are examples. Add the real WAV files before adding their entries. When a category has several valid files, one is selected randomly for each event.
+
+| What you want to do | How to do it |
+| --- | --- |
+| Add a sound | Put in a WAV and append its category and path to the playlist |
+| Replace an entry | Change the path on that line, or overwrite the same-named file |
+| Temporarily disable an entry | Put # at the beginning of the whole line, for example # normal\|Hit/Normal.wav |
+| Remove from the playlist | Delete the entry; the audio file can stay |
+| Delete completely | Remove or comment out the entry first, then delete your unwanted audio file |
+| Restore the default sound | Restore the default WAV and keep its matching default playlist entry |
+
+### Playlist Rules and Fallback
+
+- Save as UTF-8 plain text; BOM is allowed. Blank lines, surrounding whitespace and whole-line # comments are ignored. Inline comments are not supported.
+- Use / in paths and do not add quotes. Only paths relative to UserAudio are accepted. Absolute paths, drive letters, network paths, .., wildcards and executable content are rejected.
+- Do not use symlinks or directory junctions to reference external files. Spaces and UTF-8 filenames can be listed; try a simple English filename if a file cannot be read.
+- Each SFX category loads at most the first 20 valid paths. Duplicate paths within a category are deduplicated without regard to case and do not increase probability. One file can be explicitly assigned to both normal and headshot.
+- Manifests are limited to 64 KiB. Missing files, invalid paths and unsupported formats are skipped with rate-limited warnings. Oversized manifests are ignored with fallback.
+- Empty Custom weakspot/headshot pool → Custom normal pool of the same type → corresponding built-in BFV pool if that is also empty. Hit and kill pools never mix.
+- “Use normal sound for headshots” still uses the selected headshot source's normal pool. BFV's extra headshot tail is added only when BFV is explicitly selected. Custom does not add the tail, even when falling back to BFV.
+
+After editing files or playlists, **fully exit and restart the game**. Playlists are read and cached at initialization; hits, kills and track transitions do not reread manifests or scan user folders.
+
+## Mourningstar Hub BGM
+
+Enable the BGM switch in **Custom Mourningstar BGM** to use this feature; it is off by default. Volume ranges from 0 to 100, can change during playback without restarting the track, and also follows the game's master and music volume.
+
+BGM runs only in the regular Mourningstar hub. It does not run in missions, the main menu, training grounds, the shooting range or prologue_hub.
+
+### What Plays by Default
+
+UserAudio/BGM/tracks.txt contains comments only by default, and Lobby.mp3 is not bundled. The original six files therefore remain the default:
+
+~~~text
+audio/BGM/Lobby_BGM1.mp3
+audio/BGM/Lobby_BGM2.mp3
+audio/BGM/Lobby_BGM3.mp3
+audio/BGM/Lobby_BGM4.mp3
+audio/BGM/Lobby_BGM5.mp3
+audio/BGM/Lobby_BGM6.mp3
+~~~
+
+### Use Your Own BGM
+
+1. Fully exit the game, prepare real MP3 files and put them in UserAudio/BGM.
+2. Open UserAudio/BGM/tracks.txt with Notepad. Write one path relative to UserAudio per line, without normal/headshot labels:
+
+~~~text
+# Relative to UserAudio; add these files yourself before using these entries
+BGM/My_Lobby_Track.mp3
+BGM/Another_Track.mp3
+~~~
+
+3. Save as UTF-8, restart the game and enable the hub BGM switch. You do not need to select Custom in any hit or kill source dropdown.
+
+BGM loads at most 20 valid paths, chooses tracks randomly and avoids immediate repetition where possible. Renaming a file extension does not convert another format to MP3.
+
+### Playback Priority and Failure Handling
+
+| Playlist condition | What plays |
+| --- | --- |
+| At least one valid MP3 | The UserAudio playlist takes priority; it is not mixed with the old six tracks |
+| Manifest missing, empty or entirely invalid | The original six slots |
+| A valid custom track fails to start | Another not-yet-failed track from the custom playlist is tried |
+| Every custom track fails to start | Official hub music is restored; playback does not fall back to the old six tracks |
+| SimpleAudio or safe native music control is unavailable | Official music is kept or restored |
+
+The Mod attempts to suppress official hub music only after a custom track obtains a valid playback instance. Hub exit, mission entry, BGM/master switch off, Mod disable and unload stop its owned BGM instance and restore official music.
+
+To return to the old six tracks, comment out or remove every track entry in tracks.txt, then fully restart the game.
+
+## Troubleshooting and Preserving Files During Updates
+
+| Problem | Check these first |
+| --- | --- |
+| No hit or kill sounds | Master and relevant sound switches, volume, target filters, DoT/companion/melee settings, and whether SimpleAudio is enabled |
+| Custom still sounds like built-in audio | An invalid playlist or file may have triggered BFV fallback; check labels, paths, real file formats and Mod warnings |
+| CF announcements replace my custom kill sound | CF killstreak sounds are active; disable them to test the ordinary kill source |
+| File or playlist changes have no effect | Fully exit and restart the game; check duplicate extensions and UTF-8 encoding |
+| No icons | SimpleAssets, the icon switch and the icon target filter |
+| BF4 feed or CF killstreak features do not work | Enable the general killstreak mechanism, then check the feature's own switch and target filter |
+| BGM still uses the old six tracks | This is the default; UserAudio needs at least one valid MP3 entry to take priority |
+| BGM returns to official music | Check hub state, SimpleAudio and files; failed playback or safe-control checks intentionally restore official music |
+
+**Before updating:** Fully exit the game and copy the entire UserAudio folder to a safe personal location outside the installation. After updating, restore your files and playlists; manually merge any new examples you want. Installers or Mod managers may overwrite the whole folder, so do not rely on automatic preservation.
+
+Keep personal audio in UserAudio. No changes to Lua files under scripts are needed.
+
+## Backend and Validation Notes
+
+Audio normally uses SimpleAudio; icons use SimpleAssets. The old HTTP player remains only as an SFX compatibility path where available. With SimpleAudio + SimpleAssets installed, the external player executable is not required, and release packages can omit bin. BGM always uses SimpleAudio, never the HTTP player.
+
+v1.5.2 sets the short-sound voice limits managed by HKS to 5 hit, 5 kill and 10 total. These are not global limits for SimpleAudio or BGM. The pending queue remains 10, with the existing priority and replacement rules.
+
+**Current validation:** 32 local Lua tests have passed. Full-script luacheck reports 0 errors and retains 27 line-length warnings. The user's initial in-game test has not revealed any issues; dedicated checks for dense combat, failure fallback, the full BGM lifecycle and lower-end hardware have not all been recorded.
+
+## Asset Sources and Acknowledgments
+
+Built-in sounds and icons remain the property of their respective rights holders. The four default UserAudio WAVs are copies of BFV sounds already included in this Mod. No UserAudio BGM placeholder is bundled.
+
+- Battlefield sounds and BFV kill icons: EA/DICE.
+- Call of Duty sounds: Activision.
+- The Finals sounds: Embark Studios.
+- Overwatch sounds: Blizzard Entertainment.
+- Other game-themed resources belong to their respective games; the CF killstreak system was ported from EBuyToDeep_KillFeedBack.
 
 - **BiliBili UP EBuyToDeep** ([https://space.bilibili.com/1273948298](https://space.bilibili.com/1273948298)): For providing the external audio player solution that made this mod possible. The HitKillSoundsPlayer application is based on the concept from their EBuyToDeep_KillFeedBack mod.
 - **deluxghost** ([https://space.bilibili.com/4712698](https://space.bilibili.com/4712698)): For providing the SimpleAudio + SimpleAssets solution, allowing v1.2 to remove the external player requirement and use a cleaner local audio/texture loading path.
 
-## Backend Notes
+## Usage and Copyright
 
-Starting with v1.2, the mod uses SimpleAudio to play local files under `audio/HitSounds`, `audio/KillSounds`, and the v1.3 `audio/BGM` folder, and SimpleAssets to load kill icon textures. Custom hub BGM does not use the legacy HTTP player and requires SimpleAudio. The old HitKillSoundsPlayer / HTTP player logic remains as a compatibility fallback for hit/kill sounds, but Nexus Mods release packages can omit the `bin` folder.
-
-## License
-
-This mod is provided for educational and personal use only. All sound files and icon assets remain the property of their respective copyright holders.
+This Mod is provided for educational and personal use. Before replacing, sharing or redistributing personal audio, make sure you have the relevant permissions. Do not redistribute unauthorized commercial audio with the Mod.
 
 ## Changelog
+
+### v1.5.2
+
+- **Custom Audio Packs:** Custom is added to six existing source dropdowns, with default BFV WAV copies and explicitly categorized playlists. Each category supports up to 20 entries, checked and cached at startup; no Lua editing is needed.
+- **Safe fallback:** Invalid entries are skipped, duplicates are removed and warnings are rate-limited. Empty Custom weakspot/headshot pools fall back to Custom normal, then built-in BFV, without adding BFV's extra headshot tail.
+- **BGM playlists:** No UserAudio Lobby placeholder is bundled, and the playlist contains comments only by default, preserving the original six tracks. Adding valid MP3 entries gives the custom playlist priority; all custom tracks failing restores official music.
+- **Hub music restoration:** Playback-instance, volume and exit cleanup remain in place. Restoration now avoids cached-state suppression and retains retry state after temporary failures.
+- **High-fire-rate optimization:** HKS short-sound voices change to 5 hit, 5 kill and 10 total. The pending queue remains 10, with a 0.12-second maximum wait, up to 2 dispatches per update and at least 0.03 seconds between dispatch updates. Priority and replacement rules stay unchanged.
+- **Hit cooldown admission:** The shared cooldown remains 0.08 seconds and commits only after a request is admitted to the queue. Synchronous refusal does not consume cooldown; later asynchronous dispatch failure does not roll it back. Admission is not confirmed playback.
+- **Guides and validation:** Separate Chinese and English plain-text tutorials are included. All 32 local Lua tests pass, and initial user testing in game has revealed no issues; dedicated acceptance checks still need to be recorded.
 
 ### v1.5.1
 - **Battlefield V (BFV) authentic audio-visual restoration & leaving-slot fixes**:

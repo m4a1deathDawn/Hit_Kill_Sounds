@@ -18,6 +18,7 @@ local HIT_GAME_OPTIONS = {
     {text = "Call of Duty: Warzone 2",   value = "CODWZ2"},
     {text = "Delta Force",               value = "DeltaForce"},
     {text = "Apex Legends",              value = "APEX"},
+    {text = "Custom Audio Pack", value = "CUSTOM"},
 }
 
 -- 命中和击杀来源独立维护。CODBO7 目前只有击杀音效，不能出现在命中下拉框。
@@ -177,12 +178,14 @@ return {
                     {
                         setting_id = "hit_game_normal",
                         type = "dropdown",
+                        tooltip = "custom_audio_source_tooltip",
                         default_value = "BF1",
                         options = make_localized_options(HIT_GAME_OPTIONS),
                     },
                     {
                         setting_id = "hit_headshot_game",
                         type = "dropdown",
+                        tooltip = "custom_audio_source_tooltip",
                         default_value = "BF1",
                         options = make_localized_options(HIT_GAME_OPTIONS),
                     },
@@ -212,12 +215,14 @@ return {
                     {
                         setting_id = "hit_melee_normal",
                         type = "dropdown",
+                        tooltip = "custom_audio_source_tooltip",
                         default_value = "BF1",
                         options = make_localized_options(HIT_GAME_OPTIONS),
                     },
                     {
                         setting_id = "hit_melee_headshot",
                         type = "dropdown",
+                        tooltip = "custom_audio_source_tooltip",
                         default_value = "BF1",
                         options = make_localized_options(HIT_GAME_OPTIONS),
                     },
@@ -259,12 +264,14 @@ return {
                     {
                         setting_id = "kill_game_normal",
                         type = "dropdown",
+                        tooltip = "custom_audio_source_tooltip",
                         default_value = "BF1",
                         options = make_localized_options(KILL_GAME_OPTIONS),
                     },
                     {
                         setting_id = "kill_headshot_game",
                         type = "dropdown",
+                        tooltip = "custom_audio_source_tooltip",
                         default_value = "BF1",
                         options = make_localized_options(KILL_GAME_OPTIONS),
                     },
@@ -318,6 +325,7 @@ return {
                     {
                         setting_id = "lobby_bgm_enabled",
                         type = "checkbox",
+                        tooltip = "lobby_bgm_enabled_tooltip",
                         default_value = false,
                     },
                     {

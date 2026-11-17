@@ -1,0 +1,3 @@
+# type|relative path from UserAudio
+normal|Hit/Normal.wav
+headshot|Hit/Headshot.wav

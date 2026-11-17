@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports displaying kill icons on enemy kills.\n\n{#color(0,255,0)}Version v1.5.1{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀后显示击杀图标。\n\n{#color(0,255,0)}版本 v1.5.1{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.2{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.2{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -325,6 +325,22 @@ return {
     BF6 = {
         en = "Battlefield 6",
         ["zh-cn"] = "战地6",
+    },
+    custom_audio_source_tooltip = {
+        en = "Custom Audio Pack uses UserAudio WAV playlists. See UserAudio/README_Custom_Audio.txt. "
+            .. "Restart after changes. Existing sources are unchanged.",
+        ["zh-cn"] = "自定义音频包使用 UserAudio 的 WAV 播放清单。参见 UserAudio/README_自定义音频.txt。"
+            .. "修改后重启游戏；其他来源保持原样。",
+    },
+    lobby_bgm_enabled_tooltip = {
+        en = "Hub only. Valid UserAudio/BGM/tracks.txt entries take priority; otherwise use the old six slots. "
+            .. "Restart after file/playlist changes. Playback failure keeps/restores official music.",
+        ["zh-cn"] = "仅普通大厅。UserAudio/BGM/tracks.txt 有有效曲目时优先，否则使用旧六槽位。"
+            .. "修改文件/清单后重启游戏；播放失败保留或恢复官方音乐。",
+    },
+    CUSTOM = {
+        en = "Custom Audio Pack",
+        ["zh-cn"] = "自定义音频包",
     },
     BFV = {
         en = "Battlefield V",
