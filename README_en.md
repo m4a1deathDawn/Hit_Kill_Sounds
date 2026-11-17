@@ -2,7 +2,7 @@
 
 Add hit sounds, kill sounds and kill icons inspired by several games to Warhammer 40,000: Darktide. Optional features include CrossFire killstreak announcements, a Battlefield 4-style text feed and score tally, and Mourningstar hub BGM.
 
-**Current version: v1.5.2**
+**Current version: v1.5.3**
 
 ## Installation and Quick Start
 
@@ -261,6 +261,13 @@ Built-in sounds and icons remain the property of their respective rights holders
 This Mod is provided for educational and personal use. Before replacing, sharing or redistributing personal audio, make sure you have the relevant permissions. Do not redistribute unauthorized commercial audio with the Mod.
 
 ## Changelog
+
+### v1.5.3
+
+- **Native hit-sound muting:** Fix missing coverage for `melee_hits` / `melee_hits_*` events without a `play_` prefix. Keep the approved hit events and six kill events independently controlled, with player damage, toughness, warnings, reload and equip sounds excluded.
+- **BGM unload and reload recovery:** Retain and retry failed official `music_zone` restoration, including updates after shutdown. An HKS-specific persistent record carries recovery across DMF reloads, and only a successful direct Wwise call confirms restoration. Custom BGM waits while recovery is pending, and stale playback callbacks are invalidated.
+- **Dependencies:** SimpleAudio, SimpleAssets and official game scripts are unchanged. Attack eligibility, the HKS short-sound queue and existing audio assets are unchanged.
+- **Validation:** All 55 local Lua tests pass. The user reports no issues so far in initial in-game testing; full targeted acceptance and restore-failure injection remain unconfirmed.
 
 ### v1.5.2
 

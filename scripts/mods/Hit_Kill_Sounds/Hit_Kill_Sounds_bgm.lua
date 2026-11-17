@@ -36,6 +36,10 @@ local initialized = false
 local manager_hook_installed = false
 local native_music_suppressed = false
 local native_restore_pending = false
+local native_restore_state
+local native_restore_from_mission = false
+-- DMF namespaces this table by Mod and keeps it when Mod objects are rebuilt.
+local native_restore_storage = HKS:persistent_table("Hit_Kill_Sounds_native_music_restore_v1")
 local custom_bgm = false
 local failed_tracks = {}
 local play_id
@@ -235,12 +239,11 @@ local function official_music_zone_state()
     end
 
     local mission_state = mission and mission.wwise_state
-    local game_mode_name = get_game_mode_name()
+    local mission_state_confirmed = type(mission_state) == "string"
+        and mission_state ~= "" and mission_state ~= SILENCED_MUSIC_ZONE
 
-    -- 在离开 hub 的过渡帧中，以官方 mission.wwise_state 优先，避免把 hub 恢复状态带入任务。
-    if game_mode_name ~= HUB_GAME_MODE and type(mission_state) == "string" then
-        zone_state = mission_state
-    elseif not zone_state and type(mission_state) == "string" then
+    -- The official zone group also follows mission.wwise_state, including transition frames.
+    if mission_state_confirmed then
         zone_state = mission_state
     end
 
@@ -249,66 +252,88 @@ local function official_music_zone_state()
     end
 
     -- 未知状态不应被当作恢复状态写回，否则可能把原生音乐留在 None。
-    if zone_state == SILENCED_MUSIC_ZONE then
+    if type(zone_state) ~= "string" or zone_state == "" or zone_state == SILENCED_MUSIC_ZONE then
         return nil
     end
 
-    return zone_state
+    return zone_state, mission_state_confirmed
 end
 
-local function restore_native_music()
-    local zone_state = official_music_zone_state() or saved_native_music_state
-    if not zone_state then
-        return false
-    end
-
-    local wwise_game_sync = Managers and Managers.wwise_game_sync
-    if wwise_game_sync and type(wwise_game_sync._set_state) == "function" then
-        pcall(function()
-            wwise_game_sync:_set_state(MUSIC_ZONE_GROUP, zone_state)
-        end)
-    end
-
-    -- _set_state skips cached values. Direct muting did not change that cache,
-    -- so a successful manager call alone does NOT prove native music was restored.
-    if not Wwise or type(Wwise.set_state) ~= "function" then
-        return false
-    end
-    local ok = pcall(function()
-        Wwise.set_state(MUSIC_ZONE_GROUP, zone_state)
-    end)
-
-    return ok
+local function save_native_restore()
+    native_restore_storage.pending_restore = {
+        pending = true,
+        zone_state = native_restore_state,
+        saved_native_music_state = saved_native_music_state,
+        mission_state_confirmed = native_restore_from_mission,
+        created_by = "Hit_Kill_Sounds",
+    }
 end
 
-local function release_native_music()
-    local was_suppressed = native_music_suppressed
-    native_music_suppressed = false
+local function read_native_restore()
+    local record = native_restore_storage.pending_restore
+    if type(record) ~= "table" or record.created_by ~= "Hit_Kill_Sounds" or record.pending ~= true then
+        return
+    end
 
-    if not was_suppressed and not native_restore_pending then
+    native_restore_pending = true
+    native_music_suppressed = true
+    native_restore_state = record.zone_state
+    native_restore_from_mission = record.mission_state_confirmed == true
+    saved_native_music_state = record.saved_native_music_state
+end
+
+local function try_restore_native_music()
+    if not native_music_suppressed and not native_restore_pending then
         return true
     end
 
-    local restored = restore_native_music()
-    native_restore_pending = not restored
-    if not restored then
-        warn_once(
-            "restore_failed",
-            "[Hit_Kill_Sounds] Could not restore the official music_zone state after custom hub BGM stopped."
-        )
-    else
-        saved_native_music_state = nil
+    local zone_state, mission_state_confirmed = official_music_zone_state()
+    -- A confirmed mission target outranks stale group/cache state during teardown and reload.
+    -- A newly confirmed mission (including hub on return) can still replace that target.
+    if mission_state_confirmed or not native_restore_from_mission then
+        native_restore_state = zone_state or native_restore_state or saved_native_music_state
+        native_restore_from_mission = mission_state_confirmed == true
+    end
+    native_restore_pending = true
+    save_native_restore()
+
+    if native_restore_state then
+        local wwise_game_sync = Managers and Managers.wwise_game_sync
+        if wwise_game_sync and type(wwise_game_sync._set_state) == "function" then
+            pcall(function()
+                wwise_game_sync:_set_state(MUSIC_ZONE_GROUP, native_restore_state)
+            end)
+        end
+
+        -- A cache hit (or an exception after the manager changed its cache) proves nothing.
+        -- Pending restore bypasses our suppression hooks; only the direct call confirms recovery.
+        if Wwise and type(Wwise.set_state) == "function" then
+            local ok, result = pcall(Wwise.set_state, MUSIC_ZONE_GROUP, native_restore_state)
+            if ok and result ~= false then
+                native_restore_pending = false
+                saved_native_music_state = nil
+                native_restore_state = nil
+                native_restore_from_mission = false
+                native_music_suppressed = false
+                native_restore_storage.pending_restore = nil
+                return true
+            end
+        end
     end
 
-    return restored
+    warn_once(
+        "restore_failed",
+        "[Hit_Kill_Sounds] Could not restore the official music_zone state; restoration will be retried."
+    )
+    return false
 end
 
 local function mute_native_music()
-    if not is_hub() or not Wwise or type(Wwise.set_state) ~= "function" then
+    if native_restore_pending or not is_hub() or not Wwise or type(Wwise.set_state) ~= "function" then
         return false
     end
 
-    saved_native_music_state = official_music_zone_state() or HUB_GAME_MODE
+    saved_native_music_state = saved_native_music_state or official_music_zone_state() or HUB_GAME_MODE
 
     native_music_suppressed = true
     local ok = pcall(function()
@@ -317,7 +342,7 @@ local function mute_native_music()
 
     if not ok then
         -- A native call can fail after side effects; do not discard restoration state.
-        release_native_music()
+        try_restore_native_music()
     end
 
     return ok
@@ -341,11 +366,15 @@ local function block_playback(key, message)
     warn_once(key, message)
 
     if native_music_suppressed or native_restore_pending then
-        release_native_music()
+        try_restore_native_music()
     end
 end
 
 local function play_track(index)
+    if native_restore_pending then
+        return false
+    end
+
     local SimpleAudio = get_simple_audio()
     local path = BGM_PATHS[index]
 
@@ -396,7 +425,7 @@ local function play_track(index)
 
     if not ok or not valid_play_id(new_play_id) then
         -- Never leave native music suppressed while waiting for another attempt.
-        release_native_music()
+        try_restore_native_music()
         if custom_bgm then
             failed_tracks[index] = true
             warn_once("custom_track_" .. index, "[Hit_Kill_Sounds] UserAudio BGM failed: " .. path)
@@ -478,7 +507,8 @@ local function install_music_state_hook()
 
     local ok = pcall(function()
         HKS:hook(manager_class, "_set_state", function(func, self, group_name, new_state, ...)
-            if group_name == MUSIC_ZONE_GROUP and native_music_suppressed and is_hub() then
+            if group_name == MUSIC_ZONE_GROUP and native_music_suppressed
+                and not native_restore_pending and is_hub() then
                 return func(self, group_name, SILENCED_MUSIC_ZONE, ...)
             end
 
@@ -508,7 +538,7 @@ local function install_music_event_hook()
 
     local ok = pcall(function()
         SimpleAudio.hook_sound("^wwise/events/music/play_music_manager$", function()
-            if native_music_suppressed and is_hub() then
+            if native_music_suppressed and not native_restore_pending and is_hub() then
                 return false
             end
         end)
@@ -524,7 +554,7 @@ end
 local function stop_bgm(reset_track)
     stop_playback_only()
 
-    local restored = release_native_music()
+    local restored = try_restore_native_music()
 
     if reset_track then
         current_index = nil
@@ -540,10 +570,13 @@ BGM.init = function()
         return
     end
 
-    initialized = true
+    read_native_restore()
     get_simple_audio()
     install_music_state_hook()
     install_music_event_hook()
+    if native_restore_pending then
+        try_restore_native_music()
+    end
 
     local custom = HKS.HitKillSoundsCustomAudio
     local paths = custom and custom.get_bgm_paths() or {}
@@ -565,16 +598,17 @@ BGM.init = function()
     if files_valid == false then
         playback_blocked = true
     end
+    initialized = true
 end
 
 BGM.update = function(dt)
-    if not initialized then
-        return
-    end
-
     bgm_clock = bgm_clock + math.max(tonumber(dt) or 0, 0)
     if native_restore_pending then
-        release_native_music()
+        try_restore_native_music()
+    end
+
+    if not initialized or native_restore_pending then
+        return
     end
 
     local game_mode_name = get_game_mode_name()
@@ -703,8 +737,8 @@ BGM.on_setting_changed = function(setting_id)
 end
 
 BGM.shutdown = function()
-    BGM.stop(true)
-    generation = generation + 1
+    -- stop_bgm invalidates callbacks before stopping our instance and persisting any failed restore.
+    stop_bgm(true)
     initialized = false
     last_mode = nil
     init_retry_count = 0

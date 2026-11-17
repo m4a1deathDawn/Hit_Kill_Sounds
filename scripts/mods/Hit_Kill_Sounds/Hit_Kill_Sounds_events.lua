@@ -494,42 +494,22 @@ local function _cf_on_boss_kill(is_headshot, cf_sound_active, cf_icon_active, no
     end
 end
 
--- 命中/击杀 Wwise 事件名 pattern（基于 D:\暗潮mod\scripts 源码 grep 证据，2026-06-04 回填）：
---   - "melee_hits" 覆盖 wwise/events/weapon/play_melee_hits_* 全部 25+ 事件（近战物理命中音，§11）
---   - "bullet_hits" 覆盖 wwise/events/weapon/play_bullet_hits_* 全部 60+ 事件（远程/投掷物理命中音，§11）
---   - "indicator" 覆盖 wwise/events/weapon/play_*indicator* 全部 15 个事件
---     （暴击 / 爆头 / 死亡刀 / 无伤害命中 / 灵能者死亡 / 强制击杀 反馈音，§12）
---   - 击杀族：play_*_killed（minion / elite / special / monster / husk / ogryn），D:\暗潮mod\scripts\extension_systems\weapon\actions\action_sweep.lua 实战验证
--- 子串匹配：event_name:match(pattern) 不受 "wwise/events/..." 前缀影响
-local HIT_WWISE_PATTERNS  = {
-    "melee_hits",     -- 物理近战命中音（§11 已验证）
-    "bullet_hits",    -- 物理远程/投掷命中音（§11 已验证）
-    "indicator",      -- 全部命中质量反馈音（§12 新增，覆盖 15 个 play_*indicator* 事件：
-                     --   暴击 / 爆头 / 死亡刀 / 无伤害命中 / 灵能者死亡 / 强制击杀 等所有 indicator 反馈）
-    -- §11.A v1.12.1 兼容性补漏（2026-07-01）
-    "play_chord_claw_hit",               -- Cryptic 共振爪（含 _flesh / _rip_flesh）
-    "play_transonic_blades_impact_hit",  -- Cryptic 共振刃/刀
-    "play_power_sword_1h_p3_hit",        -- Power Sword P3 重做（含 _heavy / _light）
-    "play_power_sword_hit",              -- Power Sword 通用
-    "play_arc_maul_hit",                 -- Power Maul P3 arc active
-    "play_powermaul_1h_hit",             -- Power Maul P3
-    "play_psyker_chain_lightning_hit",   -- 链式闪电循环命中音（仅静音开始事件）
-    "play_ogryn_powermaul_1h_hit_sparks",
-    "play_ogryn_powermaul_1h_spark",
-    "play_arc_maul_1h_electric_sparks",
-    "play_power_sword_1h_p2_hit",
-    "play_power_sword_2h_hit",
-    "play_melee_hit_forcesword_hit_damage",
-    "play_melee_hits_forcesword_special_cleave",
-    "play_combat_weapon_chainsword_hit_impact",
-    "play_combat_weapon_chainsword_hit_res",
-    "play_weapon_addon_hit_thunderhammer_sparks",
-    "play_powermaul_1h_stuck_impact",
-    "play_powermaul_1h_stuck_impact_died",
-    "play_psyker_lightning_bolt_impact_death",
+-- §33：只按 basename 分类；旧式 melee_hits_* 没有 play_ 前缀。
+-- 家族匹配要求完整名称或下划线边界，避免路径、相似名称和 Lua pattern 误匹配。
+local HIT_WWISE_FAMILIES = {
+    "play_bullet_hits",
+    -- impact_fx_injector.lua：攻击命中 void/warp shield，属于原有 bullet_hits 覆盖范围。
+    "play_traitor_captain_shield_bullet_hits",
+    "play_indicator",
+    "play_hit_indicator",
+    "play_chord_claw_hit",
+    "play_transonic_blades_impact_hit",
+    "play_power_sword_1h_p3_hit",
+    "play_power_sword_hit",
+    "play_arc_maul_hit",
+    "play_powermaul_1h_hit",
+    "play_psyker_chain_lightning_hit", -- 仅开始事件，不拦截 stop 事件。
 }
-local KILL_WWISE_PATTERNS = { "play_minion_killed", "play_elite_killed", "play_special_killed", "play_monster_killed", "play_husk_killed", "play_ogryn_killed" }
--- 新增事件按 basename 精确比较；原有族模式继续匹配各自的 play 事件。
 local HIT_WWISE_EXACT_EVENTS = {
     ["play_ogryn_powermaul_1h_hit_sparks"] = true,
     ["play_ogryn_powermaul_1h_spark"] = true,
@@ -545,57 +525,98 @@ local HIT_WWISE_EXACT_EVENTS = {
     ["play_powermaul_1h_stuck_impact_died"] = true,
     ["play_psyker_lightning_bolt_impact_death"] = true,
 }
+local KILL_WWISE_EXACT_EVENTS = {
+    play_minion_killed = true,
+    play_elite_killed = true,
+    play_special_killed = true,
+    play_monster_killed = true,
+    play_husk_killed = true,
+    play_ogryn_killed = true,
+}
+local NON_HIT_WWISE_FAMILIES = {
+    "play_player_get_hit",
+    "play_toughness_hits",
+    "play_ogryn_hit_chest",
+    -- minion_backstab_settings.lua / player_character_sound_event_aliases.lua：玩家危险预警。
+    "play_backstab_indicator",
+    "play_indicator_backstab",
+    -- player_character_sound_event_aliases.lua 的 sfx_swing_critical 是挥击动作，不是命中。
+    "play_indicator_crit_melee_swing",
+}
 
--- 静音模式表（按 setting 状态填充；支持空表布尔短路、哈希精确匹配与字面量子串匹配）
-local silenced_patterns = {}
-local has_silenced_patterns = false
-local silenced_exact = {}
-local silenced_substrings = {}
+local hit_events_silenced = false
+local kill_events_silenced = false
 
+-- 保留原有设置刷新入口；两个开关独立缓存，不再构造混合的 substring 表。
 local function rebuild_silenced_patterns()
-    for k in pairs(silenced_patterns) do silenced_patterns[k] = nil end
-    for k in pairs(silenced_exact) do silenced_exact[k] = nil end
-    for i = #silenced_substrings, 1, -1 do silenced_substrings[i] = nil end
-
-    local hit_off  = not HKS:get("game_hit_sound_enabled")
-    local kill_off = not HKS:get("game_kill_sound_enabled")
-
-    if hit_off then
-        for _, p in ipairs(HIT_WWISE_PATTERNS) do
-            silenced_patterns[p] = true
-            if HIT_WWISE_EXACT_EVENTS[p] then
-                silenced_exact[p] = true
-            else
-                silenced_substrings[#silenced_substrings + 1] = p
-            end
-        end
-    end
-    if kill_off then
-        for _, p in ipairs(KILL_WWISE_PATTERNS) do
-            silenced_patterns[p] = true
-            silenced_substrings[#silenced_substrings + 1] = p
-        end
-    end
-
-    has_silenced_patterns = hit_off or kill_off
+    hit_events_silenced = not HKS:get("game_hit_sound_enabled")
+    kill_events_silenced = not HKS:get("game_kill_sound_enabled")
 end
 
-local function is_event_silenced(event_name)
-    if not has_silenced_patterns then return false end
-    if type(event_name) ~= "string" then return false end
-    if not string.find(event_name, "/play_", 1, true) and string.sub(event_name, 1, 5) ~= "play_" then
-        return false
+local function normalize_event_name(event_name)
+    if type(event_name) ~= "string" then
+        return nil
     end
-    local event_basename = string.match(event_name, "([^/]+)$")
-    if event_basename and silenced_exact[event_basename] then
+
+    -- 这里只提取 basename，hook 仍将原始 event_name 原样传给下一个消费者。
+    return string.match(event_name, "([^/]+)$")
+end
+
+local function is_event_family(basename, family)
+    return basename == family or string.sub(basename, 1, #family + 1) == family .. "_"
+end
+
+local function is_legacy_melee_hit_event(basename)
+    return is_event_family(basename, "melee_hits") or is_event_family(basename, "play_melee_hits")
+end
+
+local function is_modern_hit_event(basename)
+    if HIT_WWISE_EXACT_EVENTS[basename] then
         return true
     end
-    for i = 1, #silenced_substrings do
-        if string.find(event_name, silenced_substrings[i], 1, true) then
+
+    for i = 1, #HIT_WWISE_FAMILIES do
+        if is_event_family(basename, HIT_WWISE_FAMILIES[i]) then
             return true
         end
     end
+
     return false
+end
+
+local function is_kill_event(basename)
+    return KILL_WWISE_EXACT_EVENTS[basename] == true
+end
+
+local function is_event_silenced(event_name)
+    if not hit_events_silenced and not kill_events_silenced then
+        return false
+    end
+
+    local basename = normalize_event_name(event_name)
+    if not basename then
+        return false
+    end
+
+    if is_kill_event(basename) then
+        return kill_events_silenced
+    end
+    if not hit_events_silenced then
+        return false
+    end
+
+    -- 只对字面量的完整动作 token 做排除，也包含以 reload/equip 结尾的事件。
+    local action_tokens = "_" .. basename .. "_"
+    if string.find(action_tokens, "_reload_", 1, true) or string.find(action_tokens, "_equip_", 1, true) then
+        return false
+    end
+    for i = 1, #NON_HIT_WWISE_FAMILIES do
+        if is_event_family(basename, NON_HIT_WWISE_FAMILIES[i]) then
+            return false
+        end
+    end
+
+    return is_legacy_melee_hit_event(basename) or is_modern_hit_event(basename)
 end
 
 -- 内联音效配置
