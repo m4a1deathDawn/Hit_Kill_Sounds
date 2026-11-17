@@ -75,6 +75,7 @@ HKS.HitKillSoundsKillstreakCounters = killstreak_counters
 HKS.HitKillSoundsKillstreakStates = killstreak_counters
 
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_score_feed")
+HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_custom_audio")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_events")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_bgm")
 
@@ -172,6 +173,10 @@ HKS.on_all_mods_loaded = function()
 
     HKS.HitKillSoundsInitialized = true
 
+    if HKS.HitKillSoundsCustomAudio then
+        HKS.HitKillSoundsCustomAudio.init()
+    end
+
     if HKS.HitKillSoundsAudioBackend then
         HKS.HitKillSoundsAudioBackend.init()
     end
@@ -265,6 +270,19 @@ HKS.on_setting_changed = function(setting_id)
     end
 end
 
+HKS.on_enabled = function()
+    if HKS.HitKillSoundsBGM and HKS.HitKillSoundsBGM.on_setting_changed then
+        HKS.HitKillSoundsBGM.on_setting_changed("enabled")
+    end
+end
+
+HKS.on_disabled = function()
+    stop_hit_kill_audio()
+    if HKS.HitKillSoundsBGM then
+        HKS.HitKillSoundsBGM.stop(true)
+    end
+end
+
 HKS.on_unload = function()
     stop_hit_kill_audio()
     reset_all_killstreak_counters("unload")
@@ -275,5 +293,9 @@ HKS.on_unload = function()
 
     if HKS.HitKillSoundsBGM and HKS.HitKillSoundsBGM.shutdown then
         HKS.HitKillSoundsBGM.shutdown()
+    end
+
+    if HKS.HitKillSoundsCustomAudio then
+        HKS.HitKillSoundsCustomAudio.clear()
     end
 end

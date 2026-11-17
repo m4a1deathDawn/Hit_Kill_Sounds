@@ -1,0 +1,3 @@
+# relative path from UserAudio
+# Add your own MP3 path here, for example:
+# BGM/My_Lobby_Track.mp3

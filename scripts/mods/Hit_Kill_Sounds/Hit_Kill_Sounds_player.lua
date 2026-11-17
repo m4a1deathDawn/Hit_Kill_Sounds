@@ -188,12 +188,18 @@ HKS.HitKillSoundsPlayer.play_file = function(
         return false
     end
 
+    local file_path = audio_path .. path
+    local custom_prefix = "mods/Hit_Kill_Sounds/UserAudio/"
+    if path:sub(1, #custom_prefix) == custom_prefix then
+        file_path = hks_path .. "UserAudio/" .. path:sub(#custom_prefix + 1)
+    end
+
     local request_body = {
         method = "play_file",
         playing_trackid = track_id,
         left_volume = volume / 100,
         right_volume = volume / 100,
-        file_path = audio_path .. path
+        file_path = file_path
     }
 
     local ok = pcall(function()
