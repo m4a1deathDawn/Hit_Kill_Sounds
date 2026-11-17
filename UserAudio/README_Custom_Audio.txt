@@ -1,6 +1,6 @@
 Hit/Kill Sounds Mod
 UserAudio Custom Audio Guide
-For v1.5.2
+For v1.5.3
 
 1. Important things to know
 

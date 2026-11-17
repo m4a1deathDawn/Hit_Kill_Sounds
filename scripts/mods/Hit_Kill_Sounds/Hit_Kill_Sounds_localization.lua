@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.2{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.2{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.3{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.3{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
