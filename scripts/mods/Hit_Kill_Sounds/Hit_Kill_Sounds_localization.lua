@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.3{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.3{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.4{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.4{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -244,6 +244,18 @@ return {
         en = "Enable CF Kill Sound (requires Killstreak)",
         ["zh-cn"] = "启用 CF 击杀音效（需启用连杀机制）",
     },
+    cf_kill_voice = {
+        en = "CF Kill Voice",
+        ["zh-cn"] = "CF 击杀音色",
+    },
+    cf_kill_voice_male = {
+        en = "Male",
+        ["zh-cn"] = "男声",
+    },
+    cf_kill_voice_female = {
+        en = "Female",
+        ["zh-cn"] = "女声",
+    },
     BF5 = {
         en = "Battlefield 5",
         ["zh-cn"] = "战地 5 风格",
@@ -350,9 +362,17 @@ return {
         en = "Call of Duty: Black Ops 6",
         ["zh-cn"] = "使命召唤：黑色行动6",
     },
+    CODBO4 = {
+        en = "Call of Duty: Black Ops 4",
+        ["zh-cn"] = "使命召唤：黑色行动4",
+    },
     CODBO7 = {
         en = "Call of Duty: Black Ops 7",
         ["zh-cn"] = "使命召唤：黑色行动7",
+    },
+    CODBOClassic = {
+        en = "Call of Duty: Black Ops Classic",
+        ["zh-cn"] = "使命召唤：黑色行动经典",
     },
     CODBOCW = {
         en = "Call of Duty: Black Ops Cold War",
