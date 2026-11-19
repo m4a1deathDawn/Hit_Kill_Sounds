@@ -2,7 +2,7 @@
 
 Add hit sounds, kill sounds and kill icons inspired by several games to Warhammer 40,000: Darktide. Optional features include CrossFire killstreak announcements, a Battlefield 4-style text feed and score tally, and Mourningstar hub BGM.
 
-**Current version: v1.5.3**
+**Current version: v1.5.4**
 
 ## Installation and Quick Start
 
@@ -25,7 +25,7 @@ For a first check, keep the default BF1 sources and confirm that hit and kill so
 | DoT, companion and target filters | The relevant sound or icon settings | Damage-over-time, companion feedback and eligible targets have separate controls |
 | The game's original hit and kill sounds | Hit or Kill Sound Settings | Keep or mute the original game feedback |
 | BFV and CF kill icons | Kill Icon Settings | Adjust style, size, opacity, position and other options |
-| CF killstreak announcements | Kill Sound Settings | Enable CF announcements and the general killstreak mechanism |
+| CF killstreak announcements and voice | General Settings, Kill Sound Settings | Enable independent killstreak counters and CF kill sounds, then choose Male or Female |
 | BF4 text feed | Battlefield 4-style Text Kill Feed | Enable the general killstreak mechanism, then the text feed |
 | Mourningstar hub BGM | Custom Mourningstar BGM | Disabled by default; regular hub only |
 | Your own hit and kill sounds | The corresponding source dropdown | Choose Custom Audio Pack and put files in UserAudio |
@@ -40,13 +40,18 @@ Adjust size, opacity, normal/headshot colors, horizontal/vertical position and d
 
 ### CF Killstreak Sounds and Icons
 
+In **General Settings**, turn on **Enable Independent Killstreak Counters**. In **Kill Sound Settings**, turn on **Enable Kill Sounds** and **Enable CF Kill Sound (requires Killstreak)**, then choose **Male** or **Female** under **CF Kill Voice**. Male is the default, including for older configurations. After a voice change, the next eligible kill uses the new voice at the current streak's next count.
+
+- **Male:** Kills 1–9 use their corresponding sounds. From kill 10 onward in the same streak, the ninth sound repeats.
+- **Female:** Kills 1–8 use their corresponding sounds. From kill 9 onward in the same streak, the normal first-kill sound repeats.
+- **Headshots:** A weakspot kill at count 1 uses the selected voice's dedicated headshot sound. If that file is missing or **Use Normal Sound from Headshot Game for Headshot Kills** is enabled, it uses that voice's normal first-kill sound. Later headshot kills use the sound for the current streak count.
+- **Boss kills:** These play the Boss sound from the selected voice and leave the ordinary killstreak count intact.
+
 CF sounds and CF icons can be enabled separately. For example, combine CF announcements with BFV icons, or ordinary kill sounds with CF icons.
 
-- Normal killstreak announcements select the numbered sound for the current count. Above the available sound tiers, the highest tier is reused until the count times out or wraps at the configured limit.
 - Icons advance through the available tiers and keep the highest tier beyond that. A first-kill headshot can display the gold headshot icon.
-- Boss kills can trigger dedicated feedback but do not increase the ordinary killstreak count.
-- The killstreak limit defaults to 13 and ranges from 10 to 30. The reset time defaults to 2.0 seconds and ranges from 1.0 to 3.0 seconds.
-- When CF killstreak sounds are active, their existing priority rules replace the ordinary source sound for that kill. Choosing Custom does not override this behavior.
+- The killstreak limit defaults to 13 and ranges from 10 to 30. After the limit is reached, the next kill starts at count 1. The reset time defaults to 2.0 seconds and ranges from 1.0 to 3.0 seconds.
+- When CF killstreak sounds are active for a kill, they take priority over the selected kill sound source, including Custom Audio Pack.
 
 The BF4 text feed, CF sounds and CF icons each maintain their own counter and target filter. Their counts can differ and do not need to stay synchronized.
 
@@ -68,21 +73,23 @@ Enable the killstreak mechanism in General Settings, then enable the Battlefield
 | Battlefield 2042 | 24 variants | 13 variants | 6 variants | 13 variants |
 | Battlefield 6 | 28 variants | 8 variants | 6 variants | 8 variants |
 | Battlefield V | 12 variants | 5 variants | 1 | 10 variants |
+| Call of Duty: Black Ops 4 (BO4) | 1 | 1 | 3 variants | 5 variants |
 | Call of Duty: Black Ops 6 | 2 variants | 1 | 1 | 3 variants |
+| Call of Duty: Black Ops 7 (BO7) | 3 variants | 3 variants | 3 variants | 1 |
+| Call of Duty: Black Ops Classic (BO Classic) | 1 | Shared with Normal Hit | — | — |
 | Call of Duty: Black Ops Cold War | 4 variants | 4 variants | 2 | 3 variants |
 | Call of Duty: Vanguard | 13 variants | 4 variants | 3 | 2 variants |
 | Call of Duty: MW 2019 | 1 | 1 | 1 | 1 |
 | Call of Duty: MW 3 | 1 | 1 | 1 | 1 |
 | The Finals | 3 variants | 5 variants | 1 | 1 |
 | Overwatch | 1 | 1 | 2 variants | 1 |
-| Call of Duty: Black Ops 7 | — | — | 3 variants | 1 |
 | Call of Duty: Warzone | 2 variants | → normal | 1 | → normal |
 | Call of Duty: Warzone 2 | 1 | → normal | 2 variants | → normal |
 | Delta Force | 1 | → normal | 1 | 1 |
 | Apex Legends | 8 variants | → normal | 1 | → normal |
 | Custom Audio Pack | Up to 20 | Up to 20 | Up to 20 | Up to 20 |
 
-“→ normal” means the source has no dedicated headshot sound and uses its normal pool. “—” means the option is unavailable. CODBO7 appears only in kill-source dropdowns.
+“→ normal” means headshot feedback uses the source's normal sound pool. “—” marks an unavailable category. When a category has multiple variants, the mod picks one at random. BO4, BO7 and BO Classic are available for normal and weakspot hits in both ranged and melee combat. BO4 and BO7 are also available for normal and headshot kills.
 
 ## Custom Hit and Kill Sounds (UserAudio)
 
@@ -261,6 +268,13 @@ Built-in sounds and icons remain the property of their respective rights holders
 This Mod is provided for educational and personal use. Before replacing, sharing or redistributing personal audio, make sure you have the relevant permissions. Do not redistribute unauthorized commercial audio with the Mod.
 
 ## Changelog
+
+### v1.5.4
+
+- **BO4:** Added normal and weakspot hit sounds, plus three normal kill variants and five headshot kill variants.
+- **BO7:** Added three variants each for normal and weakspot hits. Replaced the headshot kill sound and kept the three normal kill variants.
+- **BO Classic:** Added a classic hit sound shared by normal and weakspot hits.
+- **CF killstreak announcements:** Added a female voice option. Male remains the default. Switching voices carries over the streak count. The female voice repeats its normal first-kill sound from kill 9 onward in the same streak.
 
 ### v1.5.3
 

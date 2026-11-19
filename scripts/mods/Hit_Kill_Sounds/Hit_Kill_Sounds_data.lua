@@ -8,6 +8,9 @@ local HIT_GAME_OPTIONS = {
     {text = "Battlefield 6", value = "BF6"},
     {text = "Battlefield V", value = "BFV"},
     {text = "Call of Duty: Black Ops 6", value = "CODBO6"},
+    {text = "Call of Duty: Black Ops 4", value = "CODBO4"},
+    {text = "Call of Duty: Black Ops 7", value = "CODBO7"},
+    {text = "Call of Duty: Black Ops Classic", value = "CODBOClassic"},
     {text = "Call of Duty: Black Ops Cold War", value = "CODBOCW"},
     {text = "Call of Duty: Vanguard", value = "CODVG"},
     {text = "Call of Duty: MW 2019", value = "CODMW2019"},
@@ -21,15 +24,13 @@ local HIT_GAME_OPTIONS = {
     {text = "Custom Audio Pack", value = "CUSTOM"},
 }
 
--- 命中和击杀来源独立维护。CODBO7 目前只有击杀音效，不能出现在命中下拉框。
+-- 击杀下拉框复用来源名称，但仅保留具有击杀资源的来源。
 local KILL_GAME_OPTIONS = {}
-for i, opt in ipairs(HIT_GAME_OPTIONS) do
-    KILL_GAME_OPTIONS[i] = {text = opt.text, value = opt.value}
+for _, opt in ipairs(HIT_GAME_OPTIONS) do
+    if opt.value ~= "CODBOClassic" then
+        KILL_GAME_OPTIONS[#KILL_GAME_OPTIONS + 1] = {text = opt.text, value = opt.value}
+    end
 end
-KILL_GAME_OPTIONS[#KILL_GAME_OPTIONS + 1] = {
-    text = "Call of Duty: Black Ops 7",
-    value = "CODBO7",
-}
 
 -- 目标类型选项（使用本地化文本）
 local TARGET_OPTIONS = {
@@ -260,6 +261,15 @@ return {
                         setting_id = "cf_kill_sound_enabled",
                         type = "checkbox",
                         default_value = false,
+                    },
+                    {
+                        setting_id = "cf_kill_voice",
+                        type = "dropdown",
+                        default_value = "male",
+                        options = {
+                            {text = HKS:localize("cf_kill_voice_male"), value = "male"},
+                            {text = HKS:localize("cf_kill_voice_female"), value = "female"},
+                        },
                     },
                     {
                         setting_id = "kill_game_normal",

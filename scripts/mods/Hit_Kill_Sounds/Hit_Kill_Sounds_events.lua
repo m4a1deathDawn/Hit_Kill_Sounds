@@ -173,9 +173,26 @@ end
 -- 默认值基于 2026-07-01 实际资源数，作为 scan 失败兜底：
 --   9 个普通音效（killsound_cf_01..09.wav）+ 1 个 boss 音（killsound_cf_boss.wav）
 --   6 个普通图标（kill1..6.png）+ 1 个首杀爆头（headshot_gold.png）
-local CF_KILL_SOUNDS_MAX = 9    -- 默认 9
-local CF_BOSS_SOUND_PATH = "KillSounds/cf/killsound_cf_boss.wav"
-local CF_HEADSHOT_SOUND_PATH = "KillSounds/cf/cf_headshot.wav"
+local CF_VOICE_ASSETS = {
+    male = {
+        max = 9,
+        base = "KillSounds/cf/male",
+        kill_pattern = "KillSounds/cf/male/killsound_cf_%02d.wav",
+        headshot = "KillSounds/cf/male/cf_headshot.wav",
+        boss = "KillSounds/cf/male/killsound_cf_boss.wav",
+    },
+    female = {
+        max = 9, -- kill9.wav is a copy of the normal first-kill sound.
+        base = "KillSounds/cf/female",
+        kill_pattern = "KillSounds/cf/female/kill%s.wav",
+        headshot = "KillSounds/cf/female/headshot.wav",
+        boss = "KillSounds/cf/female/killsound_cf_boss.wav",
+    },
+}
+
+local function _cf_voice()
+    return HKS:get("cf_kill_voice") == "female" and "female" or "male"
+end
 
 -- §13.C 图标资源（key=数字索引 "1"~"30"，特殊 key="headshot_gold"）
 local CF_KILL_ICONS_MAX = 6     -- 默认 6
@@ -216,76 +233,87 @@ end
 
 local function _scan_cf_assets()
     local SimpleAudio = get_mod and get_mod("SimpleAudio")
-    if SimpleAudio and type(SimpleAudio.glob) == "function" then
-        local ok, glob_res = pcall(SimpleAudio.glob, "KillSounds/cf/*.wav")
-        if not ok or not glob_res then
-            ok, glob_res = pcall(SimpleAudio.glob, "mods/Hit_Kill_Sounds/audio/KillSounds/cf/*.wav")
-        end
-        local files = nil
-        if ok and type(glob_res) == "table" then
-            if type(glob_res.list) == "function" then
-                local list_ok, list_res = pcall(glob_res.list, glob_res)
-                if list_ok and type(list_res) == "table" then
-                    files = list_res
+    for voice, assets in pairs(CF_VOICE_ASSETS) do
+        local files
+        if SimpleAudio and type(SimpleAudio.glob) == "function" then
+            local ok, glob_res = pcall(SimpleAudio.glob, assets.base .. "/*.wav")
+            if not ok or not glob_res then
+                ok, glob_res = pcall(SimpleAudio.glob, "mods/Hit_Kill_Sounds/audio/" .. assets.base .. "/*.wav")
+            end
+            if ok and type(glob_res) == "table" then
+                if type(glob_res.list) == "function" then
+                    local list_ok, list_res = pcall(glob_res.list, glob_res)
+                    if list_ok and type(list_res) == "table" then files = list_res end
+                else
+                    files = glob_res
                 end
-            else
-                files = glob_res
             end
         end
+
+        local has_boss = false
+        local has_headshot = false
         if files and #files > 0 then
-            local has_boss = false
-            local has_headshot = false
             for _, rel_path in ipairs(files) do
                 local filename = rel_path:match("([^/\\]+)$") or rel_path
                 if filename == "killsound_cf_boss.wav" then
                     has_boss = true
-                elseif filename == "cf_headshot.wav" then
+                elseif (voice == "male" and filename == "cf_headshot.wav") or
+                    (voice == "female" and filename == "headshot.wav") then
                     has_headshot = true
                 else
-                    local num = tonumber(filename:match("^killsound_cf_(%d+)%.wav$"))
-                    if num and num > CF_KILL_SOUNDS_MAX then
-                        CF_KILL_SOUNDS_MAX = num
+                    local num
+                    if voice == "male" then
+                        num = tonumber(filename:match("^killsound_cf_(%d+)%.wav$"))
+                    elseif filename == "kill.wav" then
+                        num = 1
+                    else
+                        num = tonumber(filename:match("^kill(%d+)%.wav$"))
+                    end
+                    if voice == "male" and num and num > assets.max then
+                        assets.max = num
                     end
                 end
             end
-            if not has_boss then CF_BOSS_SOUND_PATH = nil end
-            if not has_headshot then CF_HEADSHOT_SOUND_PATH = nil end
-            return
         end
-    end
 
-    -- 扫描音效：cwd = binaries 目录，audio 在 ../mods/Hit_Kill_Sounds/audio/
-    local lua_io = Mods and Mods.lua and Mods.lua.io
-    local scan_ok, handle = pcall(function()
-        return lua_io and lua_io.popen and lua_io.popen(
-            'dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\KillSounds\\cf\\killsound_cf_*.wav" 2>nul'
-        )
-    end)
-    if scan_ok and handle then
-        pcall(function()
-            for line in handle:lines() do
-                -- 跳过 boss 文件；扫描失败保留已确认的数量和默认值。
-                if not line:match("^killsound_cf_boss%.wav$") then
-                    local num = tonumber(line:match("^killsound_cf_(%d+)%.wav$"))
-                    if num and num > CF_KILL_SOUNDS_MAX then
-                        CF_KILL_SOUNDS_MAX = num
+        local lua_io = Mods and Mods.lua and Mods.lua.io
+        if (not files or #files == 0) and lua_io and lua_io.popen then
+            local pattern = voice == "male" and "killsound_cf_*.wav" or "kill*.wav"
+            local scan_ok, handle = pcall(lua_io.popen,
+                'dir /b "..\\mods\\Hit_Kill_Sounds\\audio\\' .. assets.base:gsub("/", "\\") .. '\\' .. pattern .. '" 2>nul')
+            if scan_ok and handle then
+                pcall(function()
+                    for line in handle:lines() do
+                        local num
+                        if voice == "male" then
+                            num = tonumber(line:match("^killsound_cf_(%d+)%.wav$"))
+                        elseif line == "kill.wav" then
+                            num = 1
+                        else
+                            num = tonumber(line:match("^kill(%d+)%.wav$"))
+                        end
+                        if voice == "male" and num and num > assets.max then
+                            assets.max = num
+                        end
                     end
-                end
+                end)
+                pcall(function() handle:close() end)
             end
-        end)
-        pcall(function()
-            handle:close()
-        end)
-    end
+        end
 
-    -- boss 文件存在性
-    if not _file_exists("../mods/Hit_Kill_Sounds/audio/KillSounds/cf/killsound_cf_boss.wav") then
-        CF_BOSS_SOUND_PATH = nil  -- 不存在时禁用 boss 音
-    end
-
-    -- 首杀爆头文件独立于 killsound_cf_数字.wav 扫描，不计入连杀数量
-    if not _file_exists("../mods/Hit_Kill_Sounds/audio/KillSounds/cf/cf_headshot.wav") then
-        CF_HEADSHOT_SOUND_PATH = nil
+        if files and #files > 0 then
+            assets.boss = has_boss and assets.boss or nil
+            assets.headshot = has_headshot and assets.headshot or nil
+        else
+            local prefix = "../mods/Hit_Kill_Sounds/audio/" .. assets.base
+            if not _file_exists(prefix .. "/killsound_cf_boss.wav") then
+                assets.boss = nil
+            end
+            local headshot_name = voice == "male" and "cf_headshot.wav" or "headshot.wav"
+            if not _file_exists(prefix .. "/" .. headshot_name) then
+                assets.headshot = nil
+            end
+        end
     end
 end
 _scan_cf_assets()
@@ -396,10 +424,12 @@ end
 -- 因此队列调度不会重新读取变化中的连杀状态。
 -- 必须放在 CF 音效消费者之前（Lua 5.4 闭包 forward-reference 规则）
 local function _cf_play_kill_sound(sound_streak_count, is_headshot)
-    if CF_KILL_SOUNDS_MAX == 0 then return end  -- 无资源时不播
+    local assets = CF_VOICE_ASSETS[_cf_voice()]
+    if not assets or assets.max == 0 then return end
 
-    local sound_idx = math.min(sound_streak_count, CF_KILL_SOUNDS_MAX)
-    local sound_path = string.format("KillSounds/cf/killsound_cf_%02d.wav", sound_idx)
+    local sound_idx = math.min(sound_streak_count, assets.max)
+    local suffix = assets == CF_VOICE_ASSETS.female and (sound_idx == 1 and "" or tostring(sound_idx)) or sound_idx
+    local sound_path = string.format(assets.kill_pattern, suffix)
 
     local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
     local volume = get_kill_volume(is_headshot)
@@ -411,13 +441,14 @@ local function _cf_play_kill_sound(sound_streak_count, is_headshot)
 end
 
 local function _cf_play_headshot_special()
-    if not CF_HEADSHOT_SOUND_PATH then
+    local assets = CF_VOICE_ASSETS[_cf_voice()]
+    if not assets or not assets.headshot then
         return false
     end
 
     local track = HKS.HitKillSoundsPlayer.TRACKS.KILL_HEADSHOT
     local played = queue_sound(
-        CF_HEADSHOT_SOUND_PATH,
+        assets.headshot,
         track,
         get_kill_volume(true),
         AUDIO_PRIORITY.HEADSHOT_KILL,
@@ -484,13 +515,14 @@ local function _cf_on_boss_kill(is_headshot, cf_sound_active, cf_icon_active, no
         cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
     end
 
-    if cf_sound_active and CF_BOSS_SOUND_PATH then
+    local assets = CF_VOICE_ASSETS[_cf_voice()]
+    if cf_sound_active and assets and assets.boss then
         local use_normal_sound = is_headshot and HKS:get("kill_headshot_use_normal") == true
         local volume = get_kill_volume(is_headshot)
         local track = get_kill_track(is_headshot, use_normal_sound)
         local sound_kind = is_headshot and "boss_headshot" or "boss_kill"
 
-        queue_sound(CF_BOSS_SOUND_PATH, track, volume, AUDIO_PRIORITY.BOSS, sound_kind)
+        queue_sound(assets.boss, track, volume, AUDIO_PRIORITY.BOSS, sound_kind)
     end
 end
 
@@ -754,6 +786,34 @@ local HIT_SOUNDS = {
             "HitSounds/CODBO6/hitsound_BO6_headshot.wav",
         },
     },
+    CODBO4 = {
+        normal = {
+            "HitSounds/CODBO4/h_bo4_armor.wav",
+        },
+        headshot = {
+            "HitSounds/CODBO4/h_bo4_head.wav",
+        },
+    },
+    CODBO7 = {
+        normal = {
+            "HitSounds/CODBO7/h_bo7_normal_1.wav",
+            "HitSounds/CODBO7/h_bo7_normal_2.wav",
+            "HitSounds/CODBO7/h_bo7_normal_3.wav",
+        },
+        headshot = {
+            "HitSounds/CODBO7/h_bo7_headshot_1.wav",
+            "HitSounds/CODBO7/h_bo7_headshot_2.wav",
+            "HitSounds/CODBO7/h_bo7_headshot_3.wav",
+        },
+    },
+    CODBOClassic = {
+        normal = {
+            "HitSounds/CODBOClassic/hitsound_BO_Classic.wav",
+        },
+        headshot = {
+            "HitSounds/CODBOClassic/hitsound_BO_Classic.wav",
+        },
+    },
     CODMW2019 = {
         normal = {
             "HitSounds/CODMW2019/hitsound_MW2019.wav",
@@ -947,6 +1007,20 @@ local KILL_SOUNDS = {
             "KillSounds/CODBO6/killsound_BO6_headshot1.wav",
             "KillSounds/CODBO6/killsound_BO6_headshot2.wav",
             "KillSounds/CODBO6/killsound_BO6_headshot3.wav",
+        },
+    },
+    CODBO4 = {
+        normal = {
+            "KillSounds/CODBO4/killsound_BO4_normal_1.wav",
+            "KillSounds/CODBO4/killsound_BO4_normal_2.wav",
+            "KillSounds/CODBO4/killsound_BO4_normal_3.wav",
+        },
+        headshot = {
+            "KillSounds/CODBO4/killsound_BO4_headshot_1.wav",
+            "KillSounds/CODBO4/killsound_BO4_headshot_2.wav",
+            "KillSounds/CODBO4/killsound_BO4_headshot_3.wav",
+            "KillSounds/CODBO4/killsound_BO4_headshot_4.wav",
+            "KillSounds/CODBO4/killsound_BO4_headshot_5.wav",
         },
     },
     CODMW2019 = {
