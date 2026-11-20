@@ -18,6 +18,7 @@ AudioBackend.PRIORITY = {
     BOSS = 0,
     HEADSHOT_KILL = 1,
     CF_KILL = 1,
+    VALORANT_KILL = 1,
     KILL = 2,
     HEADSHOT_HIT = 3,
     HIT = 4,
@@ -32,7 +33,7 @@ local MIN_DISPATCH_INTERVAL = 0.03
 local MAX_ACTIVE_VOICES = 10
 local MAX_ACTIVE_HIT_VOICES = 5
 local MAX_ACTIVE_KILL_VOICES = 5
-local MAX_VOICE_AGE = 5
+local MAX_VOICE_AGE = 8
 local VOICE_REPLACE_FADE_OUT = 0.025
 
 local pending_queue = {}

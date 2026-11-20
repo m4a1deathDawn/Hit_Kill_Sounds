@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.4{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.4{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.5{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.5{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -244,6 +244,14 @@ return {
         en = "Enable CF Kill Sound (requires Killstreak)",
         ["zh-cn"] = "启用 CF 击杀音效（需启用连杀机制）",
     },
+    killstreak_sound_style = {
+        en = "Killstreak Sound Style",
+        ["zh-cn"] = "连杀音效风格",
+    },
+    valorant_ui_fx_enabled = {
+        en = "Enable Valorant UI Layer Sounds",
+        ["zh-cn"] = "启用 Valorant UI 层伴随音效",
+    },
     cf_kill_voice = {
         en = "CF Kill Voice",
         ["zh-cn"] = "CF 击杀音色",
@@ -264,6 +272,14 @@ return {
         en = "CrossFire",
         ["zh-cn"] = "穿越火线",
     },
+    Valorant = {
+        en = "Valorant",
+        ["zh-cn"] = "无畏契约",
+    },
+    off = {
+        en = "Off",
+        ["zh-cn"] = "关闭",
+    },
     -- kill_icon_enabled_CF 已移除（2026-07-01：统一为 kill_icon_enabled 总开关）
     -- BF5 / CF 风格子分组标题
     icon_settings_bf5 = {
@@ -273,6 +289,42 @@ return {
     icon_settings_cf = {
         en = "CrossFire Icon Settings (requires Killstreak)",
         ["zh-cn"] = "穿越火线图标设置（需启用连杀机制）",
+    },
+    icon_settings_valorant = {
+        en = "Valorant Icon Settings",
+        ["zh-cn"] = "无畏契约图标设置",
+    },
+    valorant_emblem_skull = {
+        en = "Classic Skull",
+        ["zh-cn"] = "经典骷髅",
+    },
+    valorant_emblem_standard_x = {
+        en = "Standard X Wings",
+        ["zh-cn"] = "标准 X 翼",
+    },
+    valorant_emblem_style = {
+        en = "Valorant Emblem Style",
+        ["zh-cn"] = "Valorant 徽章样式",
+    },
+    valorant_particle_fx_enabled = {
+        en = "Enable Valorant Particle Effects",
+        ["zh-cn"] = "启用 Valorant 粒子特效",
+    },
+    kill_icon_transparency_valorant = {
+        en = "Valorant Icon Transparency",
+        ["zh-cn"] = "Valorant 图标透明度",
+    },
+    kill_icon_size_valorant = {
+        en = "Valorant Icon Size",
+        ["zh-cn"] = "Valorant 图标大小",
+    },
+    kill_icon_vertical_position_valorant = {
+        en = "Valorant Icon Vertical Position",
+        ["zh-cn"] = "Valorant 图标垂直位置",
+    },
+    kill_icon_horizontal_position_valorant = {
+        en = "Valorant Icon Horizontal Position",
+        ["zh-cn"] = "Valorant 图标水平位置",
     },
     cf_killstreak_max = {
         en = "Independent Killstreak Counter Max (10-30)",

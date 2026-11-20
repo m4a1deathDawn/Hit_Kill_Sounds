@@ -14,13 +14,27 @@ local function get_max_count()
     return math.max(1, tonumber(HKS:get("cf_killstreak_max")) or 13)
 end
 
-function KillstreakCounter.new(id)
+function KillstreakCounter.new(id, options)
+    options = options or {}
+
     return setmetatable({
         id = id,
         kills_counter = 0,
         last_kill_time = 0,
         last_reset_reason = nil,
+        max_count = options.max_count,
+        overflow_mode = options.overflow_mode or "loop",
     }, KillstreakCounter)
+end
+
+local function resolve_counter_max(counter)
+    local max_count = counter.max_count
+
+    if type(max_count) == "function" then
+        max_count = max_count(counter)
+    end
+
+    return math.max(1, tonumber(max_count) or get_max_count())
 end
 
 function KillstreakCounter:reset(reason)
@@ -49,7 +63,13 @@ function KillstreakCounter:preview_next(now)
         count = 0
     end
 
-    if count >= get_max_count() then
+    local max_count = resolve_counter_max(self)
+
+    if count >= max_count then
+        if self.overflow_mode == "clamp" then
+            return max_count
+        end
+
         count = 0
     end
 
@@ -67,11 +87,19 @@ function KillstreakCounter:accept(now, eligible)
         self:reset("timeout")
     end
 
-    if self.kills_counter >= get_max_count() then
-        self.kills_counter = 0
+    local max_count = resolve_counter_max(self)
+
+    if self.kills_counter >= max_count then
+        if self.overflow_mode == "clamp" then
+            self.kills_counter = max_count
+        else
+            self.kills_counter = 0
+        end
     end
 
-    self.kills_counter = self.kills_counter + 1
+    if self.kills_counter < max_count then
+        self.kills_counter = self.kills_counter + 1
+    end
     self.last_kill_time = current_time
 
     return self.kills_counter

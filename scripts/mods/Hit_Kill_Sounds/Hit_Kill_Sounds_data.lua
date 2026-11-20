@@ -82,6 +82,13 @@ end
 local STYLE_OPTIONS = {
     {text = HKS:localize("BF5"), value = "BF5"},
     {text = HKS:localize("CF"),  value = "CF"},
+    {text = HKS:localize("Valorant"), value = "Valorant"},
+}
+
+local KILLSTREAK_SOUND_STYLE_OPTIONS = {
+    {text = HKS:localize("off"), value = "off"},
+    {text = HKS:localize("CF"), value = "CF"},
+    {text = HKS:localize("Valorant"), value = "Valorant"},
 }
 
 return {
@@ -254,13 +261,16 @@ return {
                         type = "checkbox",
                         default_value = true,
                     },
-                    -- §13 CF 击杀音效独立开关（2026-07-01 解耦）
-                    -- 启用后使用 killsound_cf_01..09 顺序播放（连杀索引），替代 BF5 随机音效
-                    -- 独立于 kill_icon_style：可单独开 CF 音 + BF5 图，或 BF5 音 + CF 图
                     {
-                        setting_id = "cf_kill_sound_enabled",
+                        setting_id = "killstreak_sound_style",
+                        type = "dropdown",
+                        default_value = "off",
+                        options = make_localized_options(KILLSTREAK_SOUND_STYLE_OPTIONS),
+                    },
+                    {
+                        setting_id = "valorant_ui_fx_enabled",
                         type = "checkbox",
-                        default_value = false,
+                        default_value = true,
                     },
                     {
                         setting_id = "cf_kill_voice",
@@ -494,6 +504,54 @@ return {
                             },
                             {
                                 setting_id = "kill_icon_horizontal_position_CF",
+                                type = "numeric",
+                                default_value = 50,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                        },
+                    },
+                    {
+                        setting_id = "icon_settings_valorant",
+                        type = "group",
+                        sub_widgets = {
+                            {
+                                setting_id = "valorant_emblem_style",
+                                type = "dropdown",
+                                default_value = "skull",
+                                options = {
+                                    {text = HKS:localize("valorant_emblem_skull"), value = "skull"},
+                                    {text = HKS:localize("valorant_emblem_standard_x"), value = "standard_x"},
+                                },
+                            },
+                            {
+                                setting_id = "valorant_particle_fx_enabled",
+                                type = "checkbox",
+                                default_value = true,
+                            },
+                            {
+                                setting_id = "kill_icon_transparency_valorant",
+                                type = "numeric",
+                                default_value = 100,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_size_valorant",
+                                type = "numeric",
+                                default_value = 10,
+                                range = {5, 20},
+                                step = 1,
+                            },
+                            {
+                                setting_id = "kill_icon_vertical_position_valorant",
+                                type = "numeric",
+                                default_value = 15,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_horizontal_position_valorant",
                                 type = "numeric",
                                 default_value = 50,
                                 range = {0, 100},
