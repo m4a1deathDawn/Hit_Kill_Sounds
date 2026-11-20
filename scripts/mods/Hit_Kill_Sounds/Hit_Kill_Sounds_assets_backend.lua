@@ -8,6 +8,8 @@ local logged_simple_bf5 = false
 local logged_legacy_bf5 = false
 local logged_simple_cf = false
 local logged_legacy_cf = false
+local logged_simple_valorant = false
+local logged_legacy_valorant = false
 
 local function show_backend_message(message)
     if HKS.echo then
@@ -70,6 +72,35 @@ local function log_cf_legacy()
     else
         show_backend_message("[Hit_Kill_Sounds] CF 图标后端：legacy HTTP 不可用")
     end
+end
+
+local VALORANT_TEXTURE_KEYS = {
+    vignette = "vignette.png",
+    base_ring = "base_ring.png",
+    base_pip = "base_pip.png",
+    base_pip_hover = "base_pip_hover.png",
+    base_frame = "base_frame.png",
+    emblem_skull = "emblem_skull.png",
+    emblem_x = "emblem_x.png",
+    headshot = "headshot.png",
+    fx_base_t1 = "fx_base_t1_atlas.png",
+    fx_base_t2 = "fx_base_t2_atlas.png",
+    fx_base_t3 = "fx_base_t3_atlas.png",
+    fx_hero_flame = "fx_hero_flame_atlas.png",
+    fx_large_sparks = "fx_large_sparks_atlas.png",
+    fx_x_sparks = "fx_x_sparks_atlas.png",
+}
+
+local function log_valorant_simple()
+    if logged_simple_valorant then return end
+    logged_simple_valorant = true
+    show_backend_message("[Hit_Kill_Sounds] Valorant 图标后端：SimpleAssets")
+end
+
+local function log_valorant_legacy()
+    if logged_legacy_valorant then return end
+    logged_legacy_valorant = true
+    show_backend_message("[Hit_Kill_Sounds] Valorant 图标后端：legacy HTTP image loader")
 end
 
 local function promise_catch(promise, callback)
@@ -303,6 +334,49 @@ AssetsBackend.load_cf_icons = function(textures, on_loaded, fallback)
         fallback_with_log,
         false
     )
+end
+
+AssetsBackend.VALORANT_TEXTURE_KEYS = VALORANT_TEXTURE_KEYS
+AssetsBackend.load_valorant_icons = function(textures, fallback)
+    local base_path = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/valorant/"
+    local paths = {}
+    local path_by_key = {}
+
+    for key, filename in pairs(VALORANT_TEXTURE_KEYS) do
+        local path = base_path .. filename
+        path_by_key[key] = path
+        paths[#paths + 1] = path
+    end
+
+    local function fallback_with_log()
+        log_valorant_legacy()
+        if fallback then fallback() end
+    end
+
+    local function apply(results)
+        local loaded = 0
+        for key, path in pairs(path_by_key) do
+            local data = results and (results[path] or results[VALORANT_TEXTURE_KEYS[key]])
+            if data and data.texture then
+                textures[key] = data.texture
+                loaded = loaded + 1
+            end
+        end
+        return loaded == #paths
+    end
+
+    if not get_simple_assets() then
+        fallback_with_log()
+        return
+    end
+
+    load_textures(paths, function(results)
+        if apply(results) then
+            log_valorant_simple()
+        else
+            fallback_with_log()
+        end
+    end, fallback_with_log)
 end
 
 AssetsBackend.init = function()

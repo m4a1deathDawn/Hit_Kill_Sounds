@@ -1,8 +1,8 @@
 # Hit/Kill Sounds
 
-Add hit sounds, kill sounds and kill icons inspired by several games to Warhammer 40,000: Darktide. Optional features include CrossFire killstreak announcements, a Battlefield 4-style text feed and score tally, and Mourningstar hub BGM.
+Add hit sounds, kill sounds and kill icons inspired by several games to Warhammer 40,000: Darktide. Optional features include CrossFire and Valorant killstreak feedback, a Battlefield 4-style text feed and score tally, and Mourningstar hub BGM.
 
-**Current version: v1.5.4**
+**Current version: v1.5.5**
 
 ## Installation and Quick Start
 
@@ -24,8 +24,9 @@ For a first check, keep the default BF1 sources and confirm that hit and kill so
 | Melee kill sounds | Kill Sound Settings | An independent switch lets you mute melee kill sounds while keeping icons |
 | DoT, companion and target filters | The relevant sound or icon settings | Damage-over-time, companion feedback and eligible targets have separate controls |
 | The game's original hit and kill sounds | Hit or Kill Sound Settings | Keep or mute the original game feedback |
-| BFV and CF kill icons | Kill Icon Settings | Adjust style, size, opacity, position and other options |
+| BFV, CF and Valorant kill icons | Kill Icon Settings | Adjust style, size, opacity, position and other options |
 | CF killstreak announcements and voice | General Settings, Kill Sound Settings | Enable independent killstreak counters and CF kill sounds, then choose Male or Female |
+| Valorant kill sounds and HUD | General Settings, Kill Sound Settings, Kill Icon Settings | Enable the Valorant sound or icon style, then adjust UI layer sounds, emblems, particles and position |
 | BF4 text feed | Battlefield 4-style Text Kill Feed | Enable the general killstreak mechanism, then the text feed |
 | Mourningstar hub BGM | Custom Mourningstar BGM | Disabled by default; regular hub only |
 | Your own hit and kill sounds | The corresponding source dropdown | Choose Custom Audio Pack and put files in UserAudio |
@@ -53,7 +54,17 @@ CF sounds and CF icons can be enabled separately. For example, combine CF announ
 - The killstreak limit defaults to 13 and ranges from 10 to 30. After the limit is reached, the next kill starts at count 1. The reset time defaults to 2.0 seconds and ranges from 1.0 to 3.0 seconds.
 - When CF killstreak sounds are active for a kill, they take priority over the selected kill sound source, including Custom Audio Pack.
 
-The BF4 text feed, CF sounds and CF icons each maintain their own counter and target filter. Their counts can differ and do not need to stay synchronized.
+### Valorant Killstreak Sounds and HUD
+
+In **General Settings**, turn on **Enable Independent Killstreak Counters**. In **Kill Sound Settings**, set the killstreak sound style to Valorant and keep kill sounds enabled. In **Kill Icon Settings**, set the icon style to Valorant and keep kill icons enabled. The sound and icon features can be enabled separately.
+
+- The feature provides Valorant kill sounds and HUD icon resources for kills 1–5. The sound set also includes a first-kill appearance sound, a streak transition sound and a separate UI-layer accompaniment sound.
+- Valorant sound and icon counters are independent, use their own target filters and share the general `cf_killstreak_max` limit. After the limit is reached, the next eligible kill starts at count 1.
+- Past kill 5, both paths reuse the kill-5 resources while their counters continue toward the general limit. Boss kills count toward the applicable Valorant sound or icon counter.
+- The icon supports Classic Skull and Standard X-Wing emblem styles. Particle effects, opacity, size, horizontal position and vertical position can be controlled independently. The headshot emblem is positioned closer to the upper part of the skull.
+- The kill 1–5 arc segments follow the tangent direction of the ring, with the corresponding particle and emblem effects available for headshots.
+
+The BF4 text feed, CF sounds, CF icons, Valorant sounds and Valorant icons each maintain their own counter and target filter. Their counts can differ and do not need to stay synchronized.
 
 ### BF4 Text Feed and Score Tally
 
@@ -248,7 +259,7 @@ Audio normally uses SimpleAudio; icons use SimpleAssets. The old HTTP player rem
 
 v1.5.2 sets the short-sound voice limits managed by HKS to 5 hit, 5 kill and 10 total. These are not global limits for SimpleAudio or BGM. The pending queue remains 10, with the existing priority and replacement rules.
 
-**Current validation:** 32 local Lua tests have passed. Full-script luacheck reports 0 errors and retains 27 line-length warnings. The user's initial in-game test has not revealed any issues; dedicated checks for dense combat, failure fallback, the full BGM lifecycle and lower-end hardware have not all been recorded.
+**Current validation:** 56 local Lua tests have passed. Full-script luacheck reports 0 errors and retains 44 line-length warnings. `git diff --check` reports no whitespace errors. The user has completed the current in-game test, and the Valorant arc direction, counters and headshot emblem adjustments have not revealed any issues.
 
 ## Asset Sources and Acknowledgments
 
@@ -258,6 +269,8 @@ Built-in sounds and icons remain the property of their respective rights holders
 - Call of Duty sounds: Activision.
 - The Finals sounds: Embark Studios.
 - Overwatch sounds: Blizzard Entertainment.
+- Valorant kill icon and animation references: the [gd656killicon](https://github.com/MinecraftGD656/gd656killicon) project.
+- Hit and kill sounds from various games: extracted from the [Custom Hitmarker](https://mod.io/g/drg/m/custom-hitmarker) mod.
 - Other game-themed resources belong to their respective games; the CF killstreak system was ported from EBuyToDeep_KillFeedBack.
 
 - **BiliBili UP EBuyToDeep** ([https://space.bilibili.com/1273948298](https://space.bilibili.com/1273948298)): For providing the external audio player solution that made this mod possible. The HitKillSoundsPlayer application is based on the concept from their EBuyToDeep_KillFeedBack mod.
@@ -268,6 +281,14 @@ Built-in sounds and icons remain the property of their respective rights holders
 This Mod is provided for educational and personal use. Before replacing, sharing or redistributing personal audio, make sure you have the relevant permissions. Do not redistribute unauthorized commercial audio with the Mod.
 
 ## Changelog
+
+### v1.5.5
+
+- **Valorant kill feedback:** Added Valorant kill sounds, HUD icons, particle effects and UI-layer accompaniment sounds, with seven audio resources and fourteen icon resources.
+- **Independent counters:** Valorant sound and icon paths maintain separate killstreak counters and use the general `cf_killstreak_max` limit. Past kill 5, they reuse the kill-5 resources, while Boss kills count toward the applicable counter.
+- **Valorant HUD settings:** Added Classic Skull and Standard X-Wing emblem styles, particle, opacity, size, horizontal-position and vertical-position settings. Moved the headshot emblem upward toward the upper part of the skull.
+- **Arc and compatibility fixes:** Corrected the kill 1–5 arc segments so they follow the tangent direction of the ring, while preserving legacy CF configuration migration and independent BFV, CF and Valorant combinations.
+- **Validation:** All 56 local Lua tests pass. Luacheck reports 0 errors with 44 line-length warnings. The user completed the current in-game test without finding issues.
 
 ### v1.5.4
 

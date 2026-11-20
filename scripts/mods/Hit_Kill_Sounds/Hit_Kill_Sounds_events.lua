@@ -9,10 +9,14 @@ local killstreak_counters = HKS.HitKillSoundsKillstreakCounters or {}
 local bf4_feed_counter = killstreak_counters.bf4_feed_counter
 local cf_sound_counter = killstreak_counters.cf_sound_counter
 local cf_icon_counter = killstreak_counters.cf_icon_counter
+local valorant_sound_counter = killstreak_counters.valorant_sound_counter
+local valorant_icon_counter = killstreak_counters.valorant_icon_counter
+local VALORANT_DISPLAY_MAX = 5
 local AUDIO_PRIORITY = AudioBackend and AudioBackend.PRIORITY or {
     BOSS = 0,
     HEADSHOT_KILL = 1,
     CF_KILL = 1,
+    VALORANT_KILL = 1,
     KILL = 2,
     HEADSHOT_HIT = 3,
     HIT = 4,
@@ -357,6 +361,39 @@ local function _preload_cf_icons()
     end
 end
 
+local valorant_icon_tex = {}
+local valorant_icons_load_started = false
+
+local function _preload_valorant_icons_legacy()
+    if HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.start_player then
+        HKS.HitKillSoundsPlayer.start_player()
+    end
+
+    local host = HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.host
+    if not host then return end
+
+    local keys = HKS.HitKillSoundsAssetsBackend and HKS.HitKillSoundsAssetsBackend.VALORANT_TEXTURE_KEYS or {}
+    for key, filename in pairs(keys) do
+        local texture_key = key
+        Managers.url_loader:load_texture(host .. "image?path=cartoon_preview/kill_icon/valorant/" .. filename):next(function(data)
+            if data and data.texture then
+                valorant_icon_tex[texture_key] = data.texture
+            end
+        end)
+    end
+end
+
+local function _preload_valorant_icons()
+    if valorant_icons_load_started then return end
+    valorant_icons_load_started = true
+    if HKS.HitKillSoundsAssetsBackend then
+        HKS.HitKillSoundsAssetsBackend.load_valorant_icons(valorant_icon_tex, _preload_valorant_icons_legacy)
+    else
+        _preload_valorant_icons_legacy()
+        valorant_icons_load_started = false
+    end
+end
+
 -- §23 三个输出各自维护连杀状态；CF 图标显示状态不承担计数职责。
 local cf_icon_state = {
     current_icon = nil,
@@ -365,6 +402,14 @@ local cf_icon_state = {
     last_event_time = 0,
     animation_kind = "first",
     is_headshot = false,
+}
+
+local valorant_icon_state = {
+    streak_count = 0,
+    is_headshot = false,
+    last_event_time = 0,
+    icon_show_until = 0,
+    spin_dir = 1,
 }
 
 local function is_killstreak_enabled()
@@ -384,6 +429,14 @@ local function clear_cf_icon_state()
     cf_icon_state.last_event_time = 0
     cf_icon_state.animation_kind = "first"
     cf_icon_state.is_headshot = false
+end
+
+local function clear_valorant_icon_state()
+    valorant_icon_state.streak_count = 0
+    valorant_icon_state.is_headshot = false
+    valorant_icon_state.last_event_time = 0
+    valorant_icon_state.icon_show_until = 0
+    valorant_icon_state.spin_dir = 1
 end
 
 local function accept_counter(counter, now, eligible)
@@ -494,6 +547,32 @@ local function _cf_on_icon_kill(is_headshot, icon_streak_count, now)
     cf_icon_state.animation_kind = icon_streak_count == 1 and "first" or "upgrade"
     cf_icon_state.is_headshot = is_headshot == true
     cf_icon_state.icon_show_until = now + get_killstreak_reset_time()
+end
+
+local function _valorant_on_sound_kill(is_headshot, sound_streak_count)
+    if not sound_streak_count then return end
+
+    local idx = math.max(1, math.min(VALORANT_DISPLAY_MAX, tonumber(sound_streak_count) or 1))
+    local volume = get_kill_volume(is_headshot)
+    local track = get_kill_track(is_headshot, true)
+    local priority = idx >= 5 and AUDIO_PRIORITY.BOSS or AUDIO_PRIORITY.VALORANT_KILL
+    queue_sound(string.format("KillSounds/Valorant/k_valorant_default-%02d.wav", idx), track, volume, priority, "valorant_kill", "valorant_kill")
+
+    if HKS:get("valorant_ui_fx_enabled") ~= false then
+        local ui_path = idx == 1 and "KillSounds/Valorant/k_valorant_appear.wav" or "KillSounds/Valorant/k_valorant_transition.wav"
+        queue_sound(ui_path, HKS.HitKillSoundsPlayer.TRACKS.KILL_NORMAL, math.floor((tonumber(volume) or 100) * 0.30), AUDIO_PRIORITY.KILL, "valorant_ui_fx", "valorant_ui_fx")
+    end
+end
+
+local function _valorant_on_icon_kill(is_headshot, icon_streak_count, now)
+    if not icon_streak_count then return end
+
+    local next_dir = (valorant_icon_state.spin_dir or 1) * -1
+    valorant_icon_state.streak_count = math.max(1, math.min(VALORANT_DISPLAY_MAX, tonumber(icon_streak_count) or 1))
+    valorant_icon_state.is_headshot = is_headshot == true
+    valorant_icon_state.last_event_time = now
+    valorant_icon_state.icon_show_until = now + get_killstreak_reset_time()
+    valorant_icon_state.spin_dir = next_dir
 end
 
 -- §13.C.3 Boss 击杀（不递增通用连杀计数器，但受连杀开关保护）
@@ -1322,12 +1401,23 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         local killstreak_enabled = is_killstreak_enabled()
         local is_boss = breed_or_nil and breed_or_nil.is_boss == true
 
-        local cf_sound_on = killstreak_enabled and HKS:get("cf_kill_sound_enabled") and HKS:get("kill_sound_enabled")
+        local killstreak_sound_style = HKS:get("killstreak_sound_style") or "off"
+        if killstreak_sound_style == "off" and HKS:get("killstreak_sound_style_migrated") ~= true and
+            HKS:get("cf_kill_sound_enabled") == true then
+            killstreak_sound_style = "CF"
+        end
+        local cf_sound_on = killstreak_enabled and killstreak_sound_style == "CF" and HKS:get("kill_sound_enabled")
+        local valorant_sound_on = killstreak_enabled and killstreak_sound_style == "Valorant" and HKS:get("kill_sound_enabled")
         local cf_icon_on = killstreak_enabled and HKS:get("kill_icon_style") == "CF" and HKS:get("kill_icon_enabled")
+        local valorant_icon_on = killstreak_enabled and HKS:get("kill_icon_style") == "Valorant" and HKS:get("kill_icon_enabled")
 
         local cf_sound_active = cf_sound_on and kill_sound_target_valid and
             dot_sound_allowed and companion_kill_sound_allowed and melee_kill_sound_allowed
         local cf_icon_active = cf_icon_on and kill_icon_target_valid and
+            dot_icon_allowed and companion_kill_icon_allowed
+        local valorant_sound_active = valorant_sound_on and kill_sound_target_valid and
+            dot_sound_allowed and companion_kill_sound_allowed and melee_kill_sound_allowed
+        local valorant_icon_active = valorant_icon_on and kill_icon_target_valid and
             dot_icon_allowed and companion_kill_icon_allowed
 
         if not killstreak_enabled then
@@ -1337,6 +1427,7 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
                 HKS.reset_all_killstreak_counters("killstreak_disabled")
             end
             clear_cf_icon_state()
+            clear_valorant_icon_state()
         end
 
         -- BF4 uses a pure preview to build the complete batch.  The counter is
@@ -1373,6 +1464,16 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
             now,
             cf_icon_active and not is_boss
         )
+        local valorant_sound_streak_count = accept_counter(
+            valorant_sound_counter,
+            now,
+            valorant_sound_active
+        )
+        local valorant_icon_streak_count = accept_counter(
+            valorant_icon_counter,
+            now,
+            valorant_icon_active
+        )
 
         if is_boss then
             _cf_on_boss_kill(
@@ -1391,14 +1492,21 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
             end
         end
 
+        if valorant_sound_streak_count then
+            _valorant_on_sound_kill(is_kill_headshot, valorant_sound_streak_count)
+        end
+        if valorant_icon_streak_count then
+            _valorant_on_icon_kill(is_kill_headshot, valorant_icon_streak_count, now)
+        end
+
         -- BF5 音效：仅当 CF 音效未激活时（叠加 kill_sound_target_valid）
-        if not cf_sound_active and kill_sound_target_valid and dot_sound_allowed and
+        if not cf_sound_active and not valorant_sound_active and kill_sound_target_valid and dot_sound_allowed and
             companion_kill_sound_allowed and melee_kill_sound_allowed and HKS:get("kill_sound_enabled") then
             play_kill_sound(is_kill_headshot)
         end
 
         -- BF5 图标：仅当 CF 图标未激活时（叠加 kill_icon_target_valid）
-        if not cf_icon_active and kill_icon_target_valid and dot_icon_allowed and
+        if HKS:get("kill_icon_style") == "BF5" and not cf_icon_active and not valorant_icon_active and kill_icon_target_valid and dot_icon_allowed and
             companion_kill_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
             HKS.HitKillIconManager.show_icon(is_kill_headshot)
         end
@@ -1486,14 +1594,18 @@ end
 
 HKS.HitKillSoundsEvents.rebuild_silenced_patterns = rebuild_silenced_patterns
 HKS.HitKillSoundsEvents._preload_cf_icons = _preload_cf_icons  -- 暴露给 HudHitKillCF.init 调用（修复时序问题）
+HKS.HitKillSoundsEvents._preload_valorant_icons = _preload_valorant_icons
 -- 兼容旧调用方：reset_cf_state 现在只清理图标显示状态，不触碰任何计数器。
 HKS.HitKillSoundsEvents.reset_cf_state = clear_cf_icon_state
 HKS.HitKillSoundsEvents.clear_cf_icon_state = clear_cf_icon_state
+HKS.HitKillSoundsEvents.clear_valorant_icon_state = clear_valorant_icon_state
 
 -- §23 仅暴露三个独立实例；不存在可供 CF 音效和图标共用的 streak_count。
 HKS.HitKillSoundsKillstreakStates = killstreak_counters
 HKS.HitKillSoundsCFIconState = cf_icon_state
 HKS.HitKillSoundsCFState = cf_icon_state
 HKS.HitKillSoundsCFIconTex = cf_icon_tex
+HKS.HitKillSoundsValorantIconState = valorant_icon_state
+HKS.HitKillSoundsValorantIconTex = valorant_icon_tex
 
 return HKS.HitKillSoundsEvents

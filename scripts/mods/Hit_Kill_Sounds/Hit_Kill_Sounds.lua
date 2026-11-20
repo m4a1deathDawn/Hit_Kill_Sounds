@@ -52,6 +52,10 @@ local function clear_kill_state()
         HKS.HitKillSoundsEvents.clear_cf_icon_state()
     end
 
+    if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_valorant_icon_state then
+        HKS.HitKillSoundsEvents.clear_valorant_icon_state()
+    end
+
     clear_score_feed()
 end
 
@@ -69,6 +73,8 @@ if KillstreakCounter and KillstreakCounter.new then
     killstreak_counters.bf4_feed_counter = KillstreakCounter.new("bf4_feed_counter")
     killstreak_counters.cf_sound_counter = KillstreakCounter.new("cf_sound_counter")
     killstreak_counters.cf_icon_counter = KillstreakCounter.new("cf_icon_counter")
+    killstreak_counters.valorant_sound_counter = KillstreakCounter.new("valorant_sound_counter")
+    killstreak_counters.valorant_icon_counter = KillstreakCounter.new("valorant_icon_counter")
 end
 
 HKS.HitKillSoundsKillstreakCounters = killstreak_counters
@@ -98,6 +104,11 @@ local hud_elements = {
     {
         filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_cf_hud",
         class_name = "HudHitKillCF",
+        visibility_groups = HUD_VISIBILITY_GROUPS,
+    },
+    {
+        filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_valorant_hud",
+        class_name = "HudHitKillValorant",
         visibility_groups = HUD_VISIBILITY_GROUPS,
     },
     -- §21 BF4 风格文字击杀信息与独立计分 HUD
@@ -173,6 +184,14 @@ HKS.on_all_mods_loaded = function()
 
     HKS.HitKillSoundsInitialized = true
 
+    if HKS.get and HKS.set and HKS:get("killstreak_sound_style_migrated") ~= true then
+        local style = HKS:get("killstreak_sound_style")
+        if (style == nil or style == "off") and HKS:get("cf_kill_sound_enabled") == true then
+            HKS:set("killstreak_sound_style", "CF", false)
+        end
+        HKS:set("killstreak_sound_style_migrated", true, false)
+    end
+
     if HKS.HitKillSoundsCustomAudio then
         HKS.HitKillSoundsCustomAudio.init()
     end
@@ -203,7 +222,8 @@ local sound_counter_reset_settings = {
     kill_target = true,
     kill_sound_enabled = true,
     kill_melee_sound_enabled = true,
-    cf_kill_sound_enabled = true,
+    killstreak_sound_style = true,
+    valorant_ui_fx_enabled = true,
     kill_dot = true,
     companion_kill_sound_enabled = true,
 }
@@ -214,6 +234,12 @@ local icon_counter_reset_settings = {
     kill_icon_style = true,
     kill_dot_icon = true,
     companion_kill_icon_enabled = true,
+    valorant_emblem_style = true,
+    valorant_particle_fx_enabled = true,
+    kill_icon_transparency_valorant = true,
+    kill_icon_size_valorant = true,
+    kill_icon_vertical_position_valorant = true,
+    kill_icon_horizontal_position_valorant = true,
 }
 
 local bf4_counter_reset_settings = {
@@ -248,13 +274,18 @@ HKS.on_setting_changed = function(setting_id)
         clear_kill_state()
     elseif sound_counter_reset_settings[setting_id] then
         reset_killstreak_counter("cf_sound_counter", setting_id)
+        reset_killstreak_counter("valorant_sound_counter", setting_id)
     elseif icon_counter_reset_settings[setting_id] then
         reset_killstreak_counter("cf_icon_counter", setting_id)
+        reset_killstreak_counter("valorant_icon_counter", setting_id)
         if HKS.HitKillIconManager and HKS.HitKillIconManager.clear then
             HKS.HitKillIconManager.clear()
         end
         if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_cf_icon_state then
             HKS.HitKillSoundsEvents.clear_cf_icon_state()
+        end
+        if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_valorant_icon_state then
+            HKS.HitKillSoundsEvents.clear_valorant_icon_state()
         end
     elseif bf4_counter_reset_settings[setting_id] then
         reset_killstreak_counter("bf4_feed_counter", setting_id)
@@ -286,6 +317,15 @@ end
 HKS.on_unload = function()
     stop_hit_kill_audio()
     reset_all_killstreak_counters("unload")
+
+    if HKS.HitKillSoundsEvents then
+        if HKS.HitKillSoundsEvents.clear_cf_icon_state then
+            HKS.HitKillSoundsEvents.clear_cf_icon_state()
+        end
+        if HKS.HitKillSoundsEvents.clear_valorant_icon_state then
+            HKS.HitKillSoundsEvents.clear_valorant_icon_state()
+        end
+    end
 
     if HKS.HitKillSoundsScoreFeed and HKS.HitKillSoundsScoreFeed.clear then
         HKS.HitKillSoundsScoreFeed.clear()
