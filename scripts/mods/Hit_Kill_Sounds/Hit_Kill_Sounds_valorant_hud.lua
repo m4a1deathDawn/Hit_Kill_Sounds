@@ -73,7 +73,7 @@ local function texture_uv_style(z)
 end
 
 local function rotated_style(z)
-    local style = texture_style(z)
+    local style = texture_uv_style(z)
     style.angle = 0
     style.pivot = {0, 0}
     return style
@@ -139,8 +139,8 @@ local function set_offset(style, x, y, width, height, z)
     style.offset = {128 + x - width * 0.5, 128 + y - height * 0.5, z}
 end
 
-local function set_uv(style, texture, alpha, width, height, x, y, z, frame_idx, cols, rows, flip_x, total_frames)
-    set_texture(style, texture, alpha, 69, 255, 190)
+local function set_uv(style, texture, alpha, width, height, x, y, z, frame_idx, cols, rows, flip_x, total_frames, red, green, blue)
+    set_texture(style, texture, alpha, red or 69, green or 255, blue or 190)
     set_offset(style, x, y, width, height, z)
     frame_idx = math.floor(frame_idx or -1)
     if frame_idx < 0 then
@@ -184,9 +184,12 @@ HudHitKillValorant.update = function(self, dt, t, ui_renderer, render_settings, 
         if self._was_active then
             for _, pass in ipairs(passes) do set_hidden(widget.style[pass.style_id]) end
             self._update_scenegraph = true
+            self._was_active = false
+            self._has_active_content = false
+            HudHitKillValorant.super.update(self, dt, t, ui_renderer, render_settings, input_service)
+        else
+            self._has_active_content = false
         end
-        self._was_active = false
-        self._has_active_content = false
         return
     end
 
@@ -198,8 +201,15 @@ HudHitKillValorant.update = function(self, dt, t, ui_renderer, render_settings, 
     local now = Managers.time:time("main")
     if now >= state.icon_show_until then
         for _, pass in ipairs(passes) do set_hidden(widget.style[pass.style_id]) end
+        if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_valorant_icon_state then
+            HKS.HitKillSoundsEvents.clear_valorant_icon_state()
+        else
+            state.streak_count = 0
+        end
+        self._update_scenegraph = true
         self._was_active = false
         self._has_active_content = false
+        HudHitKillValorant.super.update(self, dt, t, ui_renderer, render_settings, input_service)
         return
     end
 
@@ -247,17 +257,21 @@ HudHitKillValorant.update = function(self, dt, t, ui_renderer, render_settings, 
     end
 
     local styles = widget.style
+    local particle_enabled = HKS:get("valorant_particle_fx_enabled") ~= false
     set_texture(styles.vignette, tex.vignette, global_alpha)
     set_offset(styles.vignette, 0, root_y_offset, 256 * scale_factor, 256 * scale_factor, 1)
 
-    local base_key = streak >= 5 and "fx_base_t3" or streak >= 3 and "fx_base_t2" or "fx_base_t1"
-    local base_rows = streak >= 5 and 6 or 7
-    local base_frame = atlas_frame(elapsed, 0, 0.025)
-    local base_total_frames = streak >= 5 and 42 or 49
-    set_uv(styles.fx_base_right, tex[base_key], global_alpha, 256 * scale_factor, 256 * scale_factor, 128 * scale_factor, root_y_offset, 2, base_frame, 7, base_rows, false, base_total_frames)
-    set_uv(styles.fx_base_left, tex[base_key], global_alpha, 256 * scale_factor, 256 * scale_factor, -128 * scale_factor, root_y_offset, 2, base_frame, 7, base_rows, true, base_total_frames)
-    styles.fx_base_right.color[1] = elapsed <= 0.62 and styles.fx_base_right.color[1] or 0
-    styles.fx_base_left.color[1] = styles.fx_base_right.color[1]
+    if particle_enabled then
+        local base_key = streak >= 5 and "fx_base_t3" or streak >= 3 and "fx_base_t2" or "fx_base_t1"
+        local base_rows = streak >= 5 and 6 or 7
+        local base_frame = atlas_frame(elapsed, 0, 0.025)
+        local base_total_frames = streak >= 5 and 42 or 49
+        set_uv(styles.fx_base_right, tex[base_key], global_alpha, 256 * scale_factor, 256 * scale_factor, 128 * scale_factor, root_y_offset, 2, base_frame, 7, base_rows, false, base_total_frames)
+        set_uv(styles.fx_base_left, tex[base_key], global_alpha, 256 * scale_factor, 256 * scale_factor, -128 * scale_factor, root_y_offset, 2, base_frame, 7, base_rows, true, base_total_frames)
+    else
+        set_hidden(styles.fx_base_right)
+        set_hidden(styles.fx_base_left)
+    end
 
     set_texture(styles.base_ring, tex.base_ring, global_alpha * ring_reveal)
     styles.base_ring.uvs[1][1], styles.base_ring.uvs[1][2] = 0, 0
@@ -283,7 +297,7 @@ HudHitKillValorant.update = function(self, dt, t, ui_renderer, render_settings, 
         local pw, ph = 68 * scale_factor * ring_scale, 64 * scale_factor * ring_scale
         for _, prefix in ipairs({"pip_hover_", "pip_up_"}) do
             local style = styles[prefix .. i]
-            set_texture(style, tex[prefix == "pip_hover_" and "base_pip_hover" or "base_pip"], active and global_alpha * (prefix == "pip_hover_" and hover_alpha or 1) or 0, 69, 255, 190)
+            set_texture(style, tex[prefix == "pip_hover_" and "base_pip_hover" or "base_pip"], active and global_alpha * (prefix == "pip_hover_" and hover_alpha or 1) or 0)
             set_offset(style, px, py, pw, ph, prefix == "pip_hover_" and 4 or 5)
             -- The source pip texture faces outward at the top of the ring.
             -- Darktide's rotated_texture screen-space rotation runs opposite
@@ -330,7 +344,6 @@ HudHitKillValorant.update = function(self, dt, t, ui_renderer, render_settings, 
     local hs_size = 38.4 * scale_factor * container_scale * bounce_scale * outro_scale
     set_offset(styles.headshot_badge, 0, root_y_offset + HEADSHOT_BADGE_Y_OFFSET * scale_factor, hs_size, hs_size, 9)
 
-    local particle_enabled = HKS:get("valorant_particle_fx_enabled") ~= false
     if particle_enabled then
         set_uv(styles.fx_hero_flame, tex.fx_hero_flame, global_alpha, 200 * scale_factor, 224 * scale_factor, 0, root_y_offset - 30 * scale_factor, 10, atlas_frame(elapsed, 0, 0.029), 5, 4, false, 20)
         set_uv(styles.fx_large_sparks, tex.fx_large_sparks, streak >= 5 and global_alpha or 0, 300 * scale_factor, 300 * scale_factor, 0, root_y_offset, 11, atlas_frame(elapsed, 0, 0.025), 8, 7, false, 52)
@@ -338,8 +351,8 @@ HudHitKillValorant.update = function(self, dt, t, ui_renderer, render_settings, 
         for i, position in ipairs(spark_positions) do
             local style = styles["fx_x_sparks_" .. i]
             local spark_elapsed = elapsed - 0.15
-            set_uv(style, tex.fx_x_sparks, state.is_headshot and spark_elapsed >= 0 and global_alpha or 0, 80 * scale_factor, 250 * scale_factor, position[1] * scale_factor, position[2] * scale_factor + root_y_offset, 12, atlas_frame(spark_elapsed, 0, 0.025), 6, 5, false, 29)
-            style.angle = math.rad(position[3])
+            set_uv(style, tex.fx_x_sparks, state.is_headshot and spark_elapsed >= 0 and global_alpha or 0, 80 * scale_factor, 250 * scale_factor, position[1] * scale_factor, position[2] * scale_factor + root_y_offset, 12, atlas_frame(spark_elapsed, 0, 0.025), 6, 5, false, 29, 255, 42, 54)
+            style.angle = -math.rad(position[3])
             style.pivot[1], style.pivot[2] = 40 * scale_factor, 125 * scale_factor
         end
     else
