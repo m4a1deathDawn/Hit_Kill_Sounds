@@ -23,7 +23,8 @@ end
 local BF5_PRIMARY_PATHS = {
     normal = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_normal.png",
     headshot = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_headshot.png",
-    circle = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle.png",
+    circle_bold = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle_bold.png",
+    circle_thin = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle_thin.png",
 }
 
 local BF5_EXISTING_PATHS = {
@@ -134,19 +135,23 @@ local function load_textures(paths, on_done, on_failed)
 end
 
 local function bf5_path_list(path_map)
-    return {
-        path_map.normal,
-        path_map.headshot,
-        path_map.circle,
-    }
+    local paths = {}
+    if path_map.normal then paths[#paths + 1] = path_map.normal end
+    if path_map.headshot then paths[#paths + 1] = path_map.headshot end
+    if path_map.circle_bold then paths[#paths + 1] = path_map.circle_bold end
+    if path_map.circle_thin then paths[#paths + 1] = path_map.circle_thin end
+    if path_map.circle then paths[#paths + 1] = path_map.circle end
+    return paths
 end
 
 local function apply_bf5_results(path_map, results, textures)
     results = results or {}
 
-    local normal = results[path_map.normal]
-    local headshot = results[path_map.headshot]
-    local circle = results[path_map.circle]
+    local normal = path_map.normal and results[path_map.normal]
+    local headshot = path_map.headshot and results[path_map.headshot]
+    local circle_bold = path_map.circle_bold and results[path_map.circle_bold]
+    local circle_thin = path_map.circle_thin and results[path_map.circle_thin]
+    local circle = path_map.circle and results[path_map.circle]
 
     if normal and normal.texture then
         textures.normal = normal.texture
@@ -154,11 +159,21 @@ local function apply_bf5_results(path_map, results, textures)
     if headshot and headshot.texture then
         textures.headshot = headshot.texture
     end
+    if circle_bold and circle_bold.texture then
+        textures.circle_bold = circle_bold.texture
+    end
+    if circle_thin and circle_thin.texture then
+        textures.circle_thin = circle_thin.texture
+    end
     if circle and circle.texture then
         textures.circle = circle.texture
     end
 
-    return textures.normal and textures.headshot and textures.circle
+    textures.circle_bold = textures.circle_bold or textures.circle_thin or textures.circle
+    textures.circle_thin = textures.circle_thin or textures.circle or textures.circle_bold
+    textures.circle = textures.circle_thin or textures.circle_bold
+
+    return textures.normal ~= nil and textures.headshot ~= nil and textures.circle ~= nil
 end
 
 local function load_bf5_with_paths(path_map, textures, fallback, try_existing_paths)
@@ -193,7 +208,7 @@ AssetsBackend.load_bf5_icons = function(textures, fallback)
         return
     end
 
-    load_bf5_with_paths(BF5_PRIMARY_PATHS, textures, fallback_with_log, false)
+    load_bf5_with_paths(BF5_PRIMARY_PATHS, textures, fallback_with_log, true)
 end
 
 local CF_ICON_SCAN_MAX = 30
