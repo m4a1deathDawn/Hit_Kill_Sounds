@@ -46,6 +46,10 @@ local function clear_kill_state()
         HKS.HitKillIconManager.clear()
     end
 
+    if HKS.HitKillBF1Manager and HKS.HitKillBF1Manager.clear then
+        HKS.HitKillBF1Manager.clear()
+    end
+
     reset_all_killstreak_counters("clear_kill_state")
 
     if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_cf_icon_state then
@@ -98,6 +102,11 @@ local hud_elements = {
     {
         filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_hud",
         class_name = "HudHitKillICON",
+        visibility_groups = HUD_VISIBILITY_GROUPS,
+    },
+    {
+        filename = "Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_bf1_hud",
+        class_name = "HudHitKillBF1",
         visibility_groups = HUD_VISIBILITY_GROUPS,
     },
     -- §13.D.2 CF HUD（2026-07-01）
@@ -211,8 +220,11 @@ HKS.on_all_mods_loaded = function()
     -- 不在这里检查播放器，因为此时播放器可能还没完全启动
 end
 
-local all_counter_reset_settings = {
+local master_reset_settings = {
     enabled = true,
+}
+
+local killstreak_reset_settings = {
     killstreak_enabled = true,
     cf_killstreak_reset_time = true,
     cf_killstreak_max = true,
@@ -234,6 +246,29 @@ local icon_counter_reset_settings = {
     kill_icon_style = true,
     kill_dot_icon = true,
     companion_kill_icon_enabled = true,
+    bf5_boss_icon_enabled = true,
+    kill_icon_boss_color_r = true,
+    kill_icon_boss_color_g = true,
+    kill_icon_boss_color_b = true,
+    bf1_display_mode = true,
+    bf1_value_mode = true,
+    bf1_victim_color_mode = true,
+    bf1_boss_icon_enabled = true,
+    kill_icon_transparency_bf1 = true,
+    bf1_bg_opacity = true,
+    bf1_normal_color_r = true,
+    bf1_normal_color_g = true,
+    bf1_normal_color_b = true,
+    bf1_headshot_color_r = true,
+    bf1_headshot_color_g = true,
+    bf1_headshot_color_b = true,
+    bf1_boss_color_r = true,
+    bf1_boss_color_g = true,
+    bf1_boss_color_b = true,
+    kill_icon_vertical_position_bf1 = true,
+    kill_icon_horizontal_position_bf1 = true,
+    kill_icon_size_bf1 = true,
+    kill_icon_duration_bf1 = true,
     valorant_emblem_style = true,
     valorant_particle_fx_enabled = true,
     kill_icon_transparency_valorant = true,
@@ -249,6 +284,10 @@ local bf4_counter_reset_settings = {
 
 local score_feed_reset_settings = {
     bf4_feed_enabled = true,
+    bf4_feed_direction = true,
+    bf4_feed_kill_line_mode = true,
+    bf4_feed_show_weapon = true,
+    bf4_feed_show_victim = true,
     bf4_feed_target = true,
     bf4_feed_duration = true,
     bf4_feed_horizontal_position = true,
@@ -270,8 +309,18 @@ HKS.on_setting_changed = function(setting_id)
         HKS.HitKillSoundsBGM.on_setting_changed(setting_id)
     end
 
-    if all_counter_reset_settings[setting_id] then
+    if master_reset_settings[setting_id] then
         clear_kill_state()
+    elseif killstreak_reset_settings[setting_id] then
+        -- BF4 text feed runs independently of killstreak_enabled; toggling killstreak
+        -- resets counters and streak-bound CF/Valorant icon states without wiping BF4.
+        reset_all_killstreak_counters(setting_id)
+        if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_cf_icon_state then
+            HKS.HitKillSoundsEvents.clear_cf_icon_state()
+        end
+        if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_valorant_icon_state then
+            HKS.HitKillSoundsEvents.clear_valorant_icon_state()
+        end
     elseif sound_counter_reset_settings[setting_id] then
         reset_killstreak_counter("cf_sound_counter", setting_id)
         reset_killstreak_counter("valorant_sound_counter", setting_id)
@@ -280,6 +329,9 @@ HKS.on_setting_changed = function(setting_id)
         reset_killstreak_counter("valorant_icon_counter", setting_id)
         if HKS.HitKillIconManager and HKS.HitKillIconManager.clear then
             HKS.HitKillIconManager.clear()
+        end
+        if HKS.HitKillBF1Manager and HKS.HitKillBF1Manager.clear then
+            HKS.HitKillBF1Manager.clear()
         end
         if HKS.HitKillSoundsEvents and HKS.HitKillSoundsEvents.clear_cf_icon_state then
             HKS.HitKillSoundsEvents.clear_cf_icon_state()
@@ -317,6 +369,14 @@ end
 HKS.on_unload = function()
     stop_hit_kill_audio()
     reset_all_killstreak_counters("unload")
+
+    if HKS.HitKillIconManager and HKS.HitKillIconManager.clear then
+        HKS.HitKillIconManager.clear()
+    end
+
+    if HKS.HitKillBF1Manager and HKS.HitKillBF1Manager.clear then
+        HKS.HitKillBF1Manager.clear()
+    end
 
     if HKS.HitKillSoundsEvents then
         if HKS.HitKillSoundsEvents.clear_cf_icon_state then

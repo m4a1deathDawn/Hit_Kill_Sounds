@@ -4,6 +4,8 @@ local HKS = get_mod("Hit_Kill_Sounds")
 local AssetsBackend = {}
 
 local simple_assets = nil
+local logged_simple_bf1 = false
+local logged_legacy_bf1 = false
 local logged_simple_bf5 = false
 local logged_legacy_bf5 = false
 local logged_simple_cf = false
@@ -20,9 +22,16 @@ local function show_backend_message(message)
 end
 
 -- 使用当前发布包中实际存在的图标路径。
+local BF1_TEXTURE_KEYS = {
+    default = "kill_default.png",
+    headshot = "kill_headshot.png",
+    boss = "kill_boss.png",
+}
+
 local BF5_PRIMARY_PATHS = {
     normal = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_normal.png",
     headshot = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_headshot.png",
+    boss = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_boss.png",
     circle_bold = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle_bold.png",
     circle_thin = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle_thin.png",
 }
@@ -30,6 +39,7 @@ local BF5_PRIMARY_PATHS = {
 local BF5_EXISTING_PATHS = {
     normal = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_normal.png",
     headshot = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_headshot.png",
+    boss = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_boss.png",
     circle = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BFV/kill_circle.png",
 }
 
@@ -39,6 +49,23 @@ local function get_simple_assets()
     end
 
     return simple_assets
+end
+
+local function log_bf1_simple()
+    if logged_simple_bf1 then return end
+    logged_simple_bf1 = true
+    show_backend_message("[Hit_Kill_Sounds] BF1 图标后端：SimpleAssets")
+end
+
+local function log_bf1_legacy()
+    if logged_legacy_bf1 then return end
+    logged_legacy_bf1 = true
+
+    if HKS.HitKillSoundsPlayer and HKS.HitKillSoundsPlayer.host then
+        show_backend_message("[Hit_Kill_Sounds] BF1 图标后端：legacy HTTP image loader")
+    else
+        show_backend_message("[Hit_Kill_Sounds] BF1 图标后端：legacy HTTP 不可用")
+    end
 end
 
 local function log_bf5_simple()
@@ -138,6 +165,7 @@ local function bf5_path_list(path_map)
     local paths = {}
     if path_map.normal then paths[#paths + 1] = path_map.normal end
     if path_map.headshot then paths[#paths + 1] = path_map.headshot end
+    if path_map.boss then paths[#paths + 1] = path_map.boss end
     if path_map.circle_bold then paths[#paths + 1] = path_map.circle_bold end
     if path_map.circle_thin then paths[#paths + 1] = path_map.circle_thin end
     if path_map.circle then paths[#paths + 1] = path_map.circle end
@@ -149,6 +177,7 @@ local function apply_bf5_results(path_map, results, textures)
 
     local normal = path_map.normal and results[path_map.normal]
     local headshot = path_map.headshot and results[path_map.headshot]
+    local boss = path_map.boss and results[path_map.boss]
     local circle_bold = path_map.circle_bold and results[path_map.circle_bold]
     local circle_thin = path_map.circle_thin and results[path_map.circle_thin]
     local circle = path_map.circle and results[path_map.circle]
@@ -158,6 +187,9 @@ local function apply_bf5_results(path_map, results, textures)
     end
     if headshot and headshot.texture then
         textures.headshot = headshot.texture
+    end
+    if boss and boss.texture then
+        textures.boss = boss.texture
     end
     if circle_bold and circle_bold.texture then
         textures.circle_bold = circle_bold.texture
@@ -195,6 +227,49 @@ local function load_bf5_with_paths(path_map, textures, fallback, try_existing_pa
             fallback()
         end
     end)
+end
+
+AssetsBackend.BF1_TEXTURE_KEYS = BF1_TEXTURE_KEYS
+AssetsBackend.load_bf1_icons = function(textures, fallback)
+    local base_path = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BF1/"
+    local paths = {}
+    local path_by_key = {}
+
+    for key, filename in pairs(BF1_TEXTURE_KEYS) do
+        local path = base_path .. filename
+        path_by_key[key] = path
+        paths[#paths + 1] = path
+    end
+
+    local function fallback_with_log()
+        log_bf1_legacy()
+        if fallback then fallback() end
+    end
+
+    local function apply(results)
+        local loaded = 0
+        for key, path in pairs(path_by_key) do
+            local data = results and (results[path] or results[BF1_TEXTURE_KEYS[key]])
+            if data and data.texture then
+                textures[key] = data.texture
+                loaded = loaded + 1
+            end
+        end
+        return textures.default ~= nil and textures.headshot ~= nil and loaded > 0
+    end
+
+    if not get_simple_assets() then
+        fallback_with_log()
+        return
+    end
+
+    load_textures(paths, function(results)
+        if apply(results) then
+            log_bf1_simple()
+        else
+            fallback_with_log()
+        end
+    end, fallback_with_log)
 end
 
 AssetsBackend.load_bf5_icons = function(textures, fallback)
