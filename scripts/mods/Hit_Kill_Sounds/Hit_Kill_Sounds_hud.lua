@@ -10,11 +10,15 @@ local MAX_LEAVING_SLOTS = 2
 
 local NORMAL_BASE_SCALE = 1.00
 local HEADSHOT_BASE_SCALE = 1.04
+local BOSS_BASE_SCALE = 1.06
 
 local NORMAL_ENTER_DURATION = 0.16
 local HEADSHOT_ENTER_DURATION = 0.18
+local BOSS_ENTER_DURATION = 0.20
+local BOSS_SPIN_DURATION = 0.42
 local ENTER_ALPHA_DURATION = 0.05
 local HEADSHOT_FLASH_DURATION = 0.10
+local BOSS_FLASH_DURATION = 0.12
 
 local BOLD_RING_DURATION = 0.24
 local THIN_RING_DURATION = 0.40
@@ -27,6 +31,7 @@ local LEAVE_OFFSET = 48
 local _textures = {
     normal = nil,
     headshot = nil,
+    boss = nil,
     circle = nil,
     circle_bold = nil,
     circle_thin = nil,
@@ -37,6 +42,7 @@ local function new_slot()
     return {
         active = false,
         is_headshot = false,
+        is_boss = false,
         start_time = 0,
         target_x = 0,
         current_x = 0,
@@ -135,6 +141,21 @@ local function has_active_slots(slots_list, leaving_list)
     return false
 end
 
+local function is_boss_icon_enabled()
+    return HKS:get("bf5_boss_icon_enabled") ~= false
+end
+
+local function is_slot_boss_active(slot)
+    return slot and slot.is_boss == true and is_boss_icon_enabled() and _textures.boss ~= nil
+end
+
+local function default_slot_base_scale(slot)
+    if is_slot_boss_active(slot) then
+        return BOSS_BASE_SCALE
+    end
+    return slot.is_headshot and HEADSHOT_BASE_SCALE or NORMAL_BASE_SCALE
+end
+
 local function copy_overflow_slot(source, now)
     local destination
     for _, slot in ipairs(manager._leaving_slots) do
@@ -147,7 +168,7 @@ local function copy_overflow_slot(source, now)
         end
     end
 
-    local default_scale = source.is_headshot and HEADSHOT_BASE_SCALE or NORMAL_BASE_SCALE
+    local default_scale = default_slot_base_scale(source)
     local fade_start_alpha = (source.render_alpha ~= nil and source.render_alpha > 0) and source.render_alpha or 1
     local fade_start_scale = (source.render_scale ~= nil and source.render_scale > 0)
         and source.render_scale or default_scale
@@ -155,6 +176,7 @@ local function copy_overflow_slot(source, now)
     destination.active = true
     destination.leaving = true
     destination.is_headshot = source.is_headshot
+    destination.is_boss = source.is_boss == true
     destination.start_time = source.start_time
     destination.current_x = source.current_x
     destination.target_x = source.current_x
@@ -192,7 +214,7 @@ end
 manager.copy_overflow_slot = copy_overflow_slot
 manager.update_leaving_slots = update_leaving_slots
 
-manager.show_icon = function(is_headshot)
+manager.show_icon = function(is_headshot, is_boss)
     local now = Managers.time:time("main")
     -- A new kill during the natural fade starts a new row rather than reviving
     -- the old row from full alpha.
@@ -215,6 +237,7 @@ manager.show_icon = function(is_headshot)
     manager._next_order = manager._next_order + 1
     slot.active = true
     slot.is_headshot = is_headshot == true
+    slot.is_boss = is_boss == true
     slot.start_time = now
     slot.current_x = 0
     slot.target_x = 0
@@ -222,7 +245,7 @@ manager.show_icon = function(is_headshot)
     slot.leaving = false
     slot.fade_start_time = nil
     slot.fade_start_alpha = 1
-    slot.fade_start_scale = slot.is_headshot and HEADSHOT_BASE_SCALE or NORMAL_BASE_SCALE
+    slot.fade_start_scale = default_slot_base_scale(slot)
     slot.render_alpha = 0
     slot.render_scale = 0
     manager._last_kill_time = now
@@ -259,6 +282,7 @@ local function preload_textures_legacy()
     local urls = {
         normal = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_normal.png",
         headshot = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_headshot.png",
+        boss = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_boss.png",
         circle_bold = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_circle_bold.png",
         circle_thin = host .. "image?path=cartoon_preview/kill_icon/BFV/kill_circle_thin.png",
     }
@@ -311,9 +335,16 @@ for i = 1, MAX_SLOTS + MAX_LEAVING_SLOTS do
         vertical_alignment = "center", size = {ICON_ROOT_SIZE, ICON_ROOT_SIZE}, position = {0, 0, -1},
     }
     widget_definitions["kill_icon_" .. i] = UIWidget.create_definition({{
-        style_id = "icon", value_id = "icon", pass_type = "texture",
-        style = {material_values = {use_placeholder_texture = 0, texture_map = nil},
-            color = {0, 255, 255, 255}, offset = {0, 0, 0}, size = {ICON_SIZE, ICON_SIZE}},
+        style_id = "icon", value_id = "icon", pass_type = "rotated_texture",
+        style = {
+            material_values = {use_placeholder_texture = 0, texture_map = nil},
+            color = {0, 255, 255, 255},
+            offset = {0, 0, 0},
+            size = {ICON_SIZE, ICON_SIZE},
+            uvs = {{0, 0}, {1, 1}},
+            angle = 0,
+            pivot = {0, 0},
+        },
         visibility_function = pass_visible,
     }}, "icon_root_" .. i)
     widget_definitions["circle_icon_" .. i] = UIWidget.create_definition({
@@ -365,7 +396,7 @@ local function clear_widget(icon_widget, circle_widget)
     end
 end
 
-local function set_pass_style(style, texture, alpha, color, size, root_size, z)
+local function set_pass_style(style, texture, alpha, color, size, root_size, z, angle)
     if not style then return end
     local clamped_alpha = math.max(0, math.min(255, math.floor((tonumber(alpha) or 0) + 0.5)))
     if not texture or clamped_alpha <= 0 or size <= 0 then
@@ -377,9 +408,27 @@ local function set_pass_style(style, texture, alpha, color, size, root_size, z)
     style.size = {size, size}
     local half_offset = (root_size - size) * 0.5
     style.offset = {half_offset, half_offset, z or 0}
+    if style.pivot then
+        style.angle = angle or 0
+        style.pivot[1] = size * 0.5
+        style.pivot[2] = size * 0.5
+    end
 end
 
-local function resolve_slot_color(slot, elapsed, colors)
+local function resolve_slot_color(slot, elapsed, colors, use_boss_icon)
+    if use_boss_icon then
+        local base = colors.boss
+        if elapsed >= BOSS_FLASH_DURATION then
+            return base
+        end
+        local flash_t = (1 - math.max(0, elapsed) / BOSS_FLASH_DURATION) ^ 2
+        local mix = 0.70 * flash_t
+        return {
+            math.min(255, math.floor(base[1] + (255 - base[1]) * mix + 0.5)),
+            math.min(255, math.floor(base[2] + (255 - base[2]) * mix + 0.5)),
+            math.min(255, math.floor(base[3] + (255 - base[3]) * mix + 0.5)),
+        }
+    end
     if not slot.is_headshot then
         return colors.normal
     end
@@ -396,7 +445,22 @@ local function resolve_slot_color(slot, elapsed, colors)
     }
 end
 
-local function compute_enter_scale(slot, elapsed)
+local function compute_enter_scale(slot, elapsed, use_boss_icon)
+    if use_boss_icon then
+        local scale_t = math.min(1, math.max(0, elapsed / BOSS_ENTER_DURATION))
+        local anim_scale
+        if scale_t < 0.62 then
+            local slam_t = scale_t / 0.62
+            local slam_eased = 1 - (1 - slam_t) ^ 3
+            anim_scale = 2.18 + (0.92 - 2.18) * slam_eased
+        else
+            local rebound_t = (scale_t - 0.62) / 0.38
+            local rebound_eased = 1 - (1 - rebound_t) ^ 2
+            anim_scale = 0.92 + (1.00 - 0.92) * rebound_eased
+        end
+        return BOSS_BASE_SCALE * anim_scale
+    end
+
     if slot.is_headshot then
         local scale_t = math.min(1, math.max(0, elapsed / HEADSHOT_ENTER_DURATION))
         local anim_scale
@@ -417,12 +481,16 @@ local function compute_enter_scale(slot, elapsed)
     return NORMAL_BASE_SCALE * (1.80 + (1.00 - 1.80) * scale_eased)
 end
 
-local function update_headshot_rings(circle_widget, slot, elapsed, size_scale, transparency_factor, slot_color, colors)
-    if not slot.is_headshot or not circle_widget or not circle_widget.style then
+local function update_headshot_rings(
+    circle_widget, slot, elapsed, size_scale, transparency_factor, slot_color, colors, use_boss_icon
+)
+    local show_rings = slot.is_headshot or use_boss_icon
+    if not show_rings or not circle_widget or not circle_widget.style then
         clear_widget(nil, circle_widget)
         return
     end
 
+    local ring_base_color = use_boss_icon and colors.boss or colors.headshot
     local bold_style = circle_widget.style.circle_bold
     local thin_style = circle_widget.style.circle
     local bold_tex = _textures.circle_bold or _textures.circle_thin or _textures.circle
@@ -463,7 +531,7 @@ local function update_headshot_rings(circle_widget, slot, elapsed, size_scale, t
             thin_style,
             thin_tex,
             thin_alpha,
-            colors.headshot,
+            ring_base_color,
             ICON_SIZE * size_scale * thin_scale,
             ICON_ROOT_SIZE,
             1
@@ -473,31 +541,42 @@ local function update_headshot_rings(circle_widget, slot, elapsed, size_scale, t
     end
 end
 
+local function resolve_slot_texture(slot, use_boss_icon)
+    if use_boss_icon then
+        return _textures.boss
+    end
+    return slot.is_headshot and _textures.headshot or _textures.normal
+end
+
 local function update_item(self, slot, index, now, step_dt, y_pos, size_scale, transparency_factor, colors, is_leaving)
     local icon_widget = self._widgets_by_name["kill_icon_" .. index]
     local circle_widget = self._widgets_by_name["circle_icon_" .. index]
     local root = self._ui_scenegraph["icon_root_" .. index]
     if not root then return end
 
+    local use_boss_icon = is_slot_boss_active(slot)
+
     if is_leaving then
         if not update_leaving_slot_state(slot, now, size_scale) then
             clear_widget(icon_widget, circle_widget)
             return
         end
-        local color = slot.is_headshot and colors.headshot or colors.normal
+        local color = use_boss_icon and colors.boss or (slot.is_headshot and colors.headshot or colors.normal)
+        local leave_angle = use_boss_icon and -math.rad(45) or 0
         set_pass_style(
             icon_widget and icon_widget.style and icon_widget.style.icon,
-            slot.is_headshot and _textures.headshot or _textures.normal,
+            resolve_slot_texture(slot, use_boss_icon),
             255 * slot.render_alpha * transparency_factor,
             color,
             ICON_SIZE * size_scale * slot.render_scale,
             ICON_ROOT_SIZE,
-            0
+            0,
+            leave_angle
         )
         clear_widget(nil, circle_widget)
     else
         local elapsed = math.max(0, now - slot.start_time)
-        local scale_multiplier = compute_enter_scale(slot, elapsed)
+        local scale_multiplier = compute_enter_scale(slot, elapsed, use_boss_icon)
         local alpha = math.min(1, elapsed / ENTER_ALPHA_DURATION)
 
         if slot.fade_start_time then
@@ -525,17 +604,25 @@ local function update_item(self, slot, index, now, step_dt, y_pos, size_scale, t
 
         slot.render_alpha = alpha
         slot.render_scale = scale_multiplier
-        local slot_color = resolve_slot_color(slot, elapsed, colors)
+        local slot_color = resolve_slot_color(slot, elapsed, colors, use_boss_icon)
+        local icon_angle = 0
+        if use_boss_icon then
+            local spin_t = math.min(1, math.max(0, elapsed / BOSS_SPIN_DURATION))
+            icon_angle = -math.rad(45 * (1 - (1 - spin_t) ^ 3))
+        end
         set_pass_style(
             icon_widget and icon_widget.style and icon_widget.style.icon,
-            slot.is_headshot and _textures.headshot or _textures.normal,
+            resolve_slot_texture(slot, use_boss_icon),
             255 * alpha * transparency_factor,
             slot_color,
             ICON_SIZE * size_scale * slot.render_scale,
             ICON_ROOT_SIZE,
-            0
+            0,
+            icon_angle
         )
-        update_headshot_rings(circle_widget, slot, elapsed, size_scale, transparency_factor, slot_color, colors)
+        update_headshot_rings(
+            circle_widget, slot, elapsed, size_scale, transparency_factor, slot_color, colors, use_boss_icon
+        )
     end
     root.position[1] = slot.current_x
     root.position[2] = y_pos
@@ -579,7 +666,7 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
         manager._natural_fade_start = now
         for _, active in ipairs(manager._slots) do
             if active.active then
-                local default_scale = active.is_headshot and HEADSHOT_BASE_SCALE or NORMAL_BASE_SCALE
+                local default_scale = default_slot_base_scale(active)
                 active.fade_start_time = now
                 active.fade_start_alpha = (active.render_alpha ~= nil and active.render_alpha > 0)
                     and active.render_alpha or 1
@@ -604,6 +691,11 @@ HudHitKillICON.update = function(self, dt, t, ui_renderer, render_settings, inpu
             HKS:get("kill_icon_headshot_color_r") or 255,
             HKS:get("kill_icon_headshot_color_g") or 140,
             HKS:get("kill_icon_headshot_color_b") or 20,
+        },
+        boss = {
+            HKS:get("kill_icon_boss_color_r") or 220,
+            HKS:get("kill_icon_boss_color_g") or 46,
+            HKS:get("kill_icon_boss_color_b") or 38,
         },
     }
     recompute_targets(now)

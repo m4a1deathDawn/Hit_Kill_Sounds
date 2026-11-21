@@ -78,9 +78,18 @@ local function make_localized_options(raw_options)
     return result
 end
 
--- §13.E.1 风格切换选项（BF5 / CF）
+local function copy_options(raw_options)
+    local result = {}
+    for i, opt in ipairs(raw_options) do
+        result[i] = { text = opt.text, value = opt.value }
+    end
+    return result
+end
+
+-- §13.E.1 风格切换选项（BF5 / BF1 / CF / Valorant）
 local STYLE_OPTIONS = {
     {text = HKS:localize("BF5"), value = "BF5"},
+    {text = HKS:localize("BF1_style"), value = "BF1"},
     {text = HKS:localize("CF"),  value = "CF"},
     {text = HKS:localize("Valorant"), value = "Valorant"},
 }
@@ -139,6 +148,35 @@ return {
                         default_value = false,
                     },
                     {
+                        setting_id = "bf4_feed_direction",
+                        type = "dropdown",
+                        default_value = "top_down",
+                        options = {
+                            {text = HKS:localize("bf4_feed_direction_top_down"), value = "top_down"},
+                            {text = HKS:localize("bf4_feed_direction_bottom_up"), value = "bottom_up"},
+                        },
+                    },
+                    {
+                        setting_id = "bf4_feed_kill_line_mode",
+                        type = "dropdown",
+                        default_value = "transform",
+                        options = {
+                            {text = HKS:localize("bf4_feed_kill_line_transform"), value = "transform"},
+                            {text = HKS:localize("bf4_feed_kill_line_direct"), value = "direct"},
+                            {text = HKS:localize("bf4_feed_kill_line_classic"), value = "classic"},
+                        },
+                    },
+                    {
+                        setting_id = "bf4_feed_show_weapon",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    {
+                        setting_id = "bf4_feed_show_victim",
+                        type = "checkbox",
+                        default_value = true,
+                    },
+                    {
                         setting_id = "bf4_feed_target",
                         type = "dropdown",
                         default_value = "all",
@@ -161,7 +199,7 @@ return {
                     {
                         setting_id = "bf4_feed_vertical_position",
                         type = "numeric",
-                        default_value = 25, -- bf4_score_feed_offset_y = 25
+                        default_value = 35, -- 距底 35%，从上往下弹时位于准星中下方
                         range = {0, 100},
                         step = 5,
                     },
@@ -366,7 +404,7 @@ return {
                         setting_id = "kill_icon_style",
                         type = "dropdown",
                         default_value = "BF5",
-                        options = make_localized_options(STYLE_OPTIONS),
+                        options = copy_options(STYLE_OPTIONS),
                     },
                     {
                         setting_id = "kill_icon_enabled",
@@ -442,6 +480,29 @@ return {
                                 range = {0, 255},
                             },
                             {
+                                setting_id = "bf5_boss_icon_enabled",
+                                type = "checkbox",
+                                default_value = true,
+                            },
+                            {
+                                setting_id = "kill_icon_boss_color_r",
+                                type = "numeric",
+                                default_value = 220,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_boss_color_g",
+                                type = "numeric",
+                                default_value = 46,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_boss_color_b",
+                                type = "numeric",
+                                default_value = 38,
+                                range = {0, 255},
+                            },
+                            {
                                 setting_id = "kill_icon_vertical_position",
                                 type = "numeric",
                                 default_value = 75,
@@ -472,6 +533,149 @@ return {
                                     {text = "2.0s", value = "20"},
                                     {text = "2.5s", value = "25"},
                                     {text = "3.0s", value = "30"},
+                                },
+                            },
+                        },
+                    },
+                    -- BF1 风格子分组（对称 3 图标 + 双格战报横幅 + 对齐 BF5 基础调节项）
+                    {
+                        setting_id = "icon_settings_bf1",
+                        type = "group",
+                        sub_widgets = {
+                            {
+                                setting_id = "bf1_display_mode",
+                                type = "dropdown",
+                                default_value = "banner",
+                                options = {
+                                    {text = HKS:localize("bf1_display_mode_banner"), value = "banner"},
+                                    {text = HKS:localize("bf1_display_mode_icon_only"), value = "icon_only"},
+                                },
+                            },
+                            {
+                                setting_id = "bf1_value_mode",
+                                type = "dropdown",
+                                default_value = "score",
+                                options = {
+                                    {text = HKS:localize("bf1_value_mode_score"), value = "score"},
+                                    {text = HKS:localize("bf1_value_mode_max_health"), value = "max_health"},
+                                    {text = HKS:localize("bf1_value_mode_damage"), value = "damage"},
+                                    {text = HKS:localize("bf1_value_mode_none"), value = "none"},
+                                },
+                            },
+                            {
+                                setting_id = "bf1_victim_color_mode",
+                                type = "dropdown",
+                                default_value = "bf1_red",
+                                options = {
+                                    {text = HKS:localize("bf1_victim_color_bf1_red"), value = "bf1_red"},
+                                    {text = HKS:localize("bf1_victim_color_enemy_tier"), value = "enemy_tier"},
+                                },
+                            },
+                            {
+                                setting_id = "bf1_boss_icon_enabled",
+                                type = "checkbox",
+                                default_value = true,
+                            },
+                            {
+                                setting_id = "kill_icon_transparency_bf1",
+                                type = "numeric",
+                                default_value = 100,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "bf1_bg_opacity",
+                                type = "numeric",
+                                default_value = 48,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "bf1_normal_color_r",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_normal_color_g",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_normal_color_b",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_headshot_color_r",
+                                type = "numeric",
+                                default_value = 232,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_headshot_color_g",
+                                type = "numeric",
+                                default_value = 185,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_headshot_color_b",
+                                type = "numeric",
+                                default_value = 7,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_boss_color_r",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_boss_color_g",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "bf1_boss_color_b",
+                                type = "numeric",
+                                default_value = 255,
+                                range = {0, 255},
+                            },
+                            {
+                                setting_id = "kill_icon_vertical_position_bf1",
+                                type = "numeric",
+                                default_value = 75,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_horizontal_position_bf1",
+                                type = "numeric",
+                                default_value = 50,
+                                range = {0, 100},
+                                step = 5,
+                            },
+                            {
+                                setting_id = "kill_icon_size_bf1",
+                                type = "numeric",
+                                default_value = 10,
+                                range = {5, 20},
+                                step = 1,
+                            },
+                            {
+                                setting_id = "kill_icon_duration_bf1",
+                                type = "dropdown",
+                                default_value = "25",
+                                options = {
+                                    {text = "1.0s", value = "10"},
+                                    {text = "1.5s", value = "15"},
+                                    {text = "2.0s", value = "20"},
+                                    {text = "2.5s", value = "25"},
+                                    {text = "3.0s", value = "30"},
+                                    {text = "4.5s", value = "45"},
                                 },
                             },
                         },

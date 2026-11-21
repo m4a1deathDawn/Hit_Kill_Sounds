@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.6{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.6{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.7{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.7{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -35,12 +35,48 @@ return {
         ["zh-cn"] = "通用设置",
     },
     bf4_feed_settings = {
-        en = "Battlefield 4-style Text Kill Feed (requires Killstreak)",
-        ["zh-cn"] = "战地4风格文字击杀信息（需启用连杀机制）",
+        en = "Battlefield 4-style Text Kill Feed",
+        ["zh-cn"] = "战地4风格文字击杀信息",
     },
     bf4_feed_enabled = {
         en = "Enable Battlefield 4-style Text Kill Feed",
         ["zh-cn"] = "启用战地4风格文字击杀信息",
+    },
+    bf4_feed_direction = {
+        en = "Text Feed Cascade Direction",
+        ["zh-cn"] = "文字信息弹出方向",
+    },
+    bf4_feed_direction_top_down = {
+        en = "Top to Bottom (BF4 Default)",
+        ["zh-cn"] = "从上往下弹（战地 4 原版）",
+    },
+    bf4_feed_direction_bottom_up = {
+        en = "Bottom to Top (Classic)",
+        ["zh-cn"] = "从下往上弹（旧版）",
+    },
+    bf4_feed_kill_line_mode = {
+        en = "Kill Line Display Mode",
+        ["zh-cn"] = "击杀主行显示样式",
+    },
+    bf4_feed_kill_line_transform = {
+        en = "BF4 Two-Stage Transform (Event -> [Weapon] Enemy)",
+        ["zh-cn"] = "战地 4 两段变身（事件确认 → [武器] 敌人）",
+    },
+    bf4_feed_kill_line_direct = {
+        en = "Direct ([Weapon] Enemy)",
+        ["zh-cn"] = "直接显示（[武器] 敌人）",
+    },
+    bf4_feed_kill_line_classic = {
+        en = "Classic Event Label Only",
+        ["zh-cn"] = "经典纯事件标签",
+    },
+    bf4_feed_show_weapon = {
+        en = "Show Weapon / Kill Method Name",
+        ["zh-cn"] = "显示武器 / 击杀方式名称",
+    },
+    bf4_feed_show_victim = {
+        en = "Show Victim Enemy Name",
+        ["zh-cn"] = "显示被击杀敌人名称",
     },
     bf4_feed_target = {
         en = "BF4 Text Feed Target (BF4 text events only)",
@@ -268,6 +304,10 @@ return {
         en = "Battlefield 5",
         ["zh-cn"] = "战地 5 风格",
     },
+    BF1_style = {
+        en = "Battlefield 1",
+        ["zh-cn"] = "战地 1 风格",
+    },
     CF = {
         en = "CrossFire",
         ["zh-cn"] = "穿越火线",
@@ -281,10 +321,186 @@ return {
         ["zh-cn"] = "关闭",
     },
     -- kill_icon_enabled_CF 已移除（2026-07-01：统一为 kill_icon_enabled 总开关）
-    -- BF5 / CF 风格子分组标题
+    -- BF5 / BF1 / CF / Valorant 风格子分组标题
     icon_settings_bf5 = {
         en = "Battlefield 5 Icon Settings",
         ["zh-cn"] = "战地 5 图标设置",
+    },
+    bf5_boss_icon_enabled = {
+        en = "Use Battlefield V Gear Icon for Boss Kills",
+        ["zh-cn"] = "击杀 Boss 时使用战地 5 载具摧毁齿轮图标",
+    },
+    kill_icon_boss_color_r = {
+        en = "Boss Icon Color - Red",
+        ["zh-cn"] = "Boss 图标颜色 - 红",
+    },
+    kill_icon_boss_color_g = {
+        en = "Boss Icon Color - Green",
+        ["zh-cn"] = "Boss 图标颜色 - 绿",
+    },
+    kill_icon_boss_color_b = {
+        en = "Boss Icon Color - Blue",
+        ["zh-cn"] = "Boss 图标颜色 - 蓝",
+    },
+    icon_settings_bf1 = {
+        en = "Battlefield 1 Icon Settings",
+        ["zh-cn"] = "战地 1 图标设置",
+    },
+    bf1_display_mode = {
+        en = "BF1 Display Mode",
+        ["zh-cn"] = "BF1 显示模式",
+    },
+    bf1_display_mode_banner = {
+        en = "Full Kill Banner (Icon + Victim/Weapon/Score)",
+        ["zh-cn"] = "完整战报横幅（图标 + 敌名/武器/分值）",
+    },
+    bf1_display_mode_icon_only = {
+        en = "Icon Box Only",
+        ["zh-cn"] = "仅图标框",
+    },
+    bf1_value_mode = {
+        en = "BF1 Right Value Display",
+        ["zh-cn"] = "BF1 右侧数值显示",
+    },
+    bf1_value_mode_score = {
+        en = "BF1 Classic Kill Score",
+        ["zh-cn"] = "战地 1 经典击杀分值",
+    },
+    bf1_value_mode_max_health = {
+        en = "Target Max Health",
+        ["zh-cn"] = "目标最大生命值",
+    },
+    bf1_value_mode_damage = {
+        en = "Killing Blow Damage",
+        ["zh-cn"] = "致死伤害",
+    },
+    bf1_value_mode_none = {
+        en = "Hidden",
+        ["zh-cn"] = "隐藏",
+    },
+    bf1_victim_color_mode = {
+        en = "BF1 Victim Name Color",
+        ["zh-cn"] = "BF1 敌方名称颜色",
+    },
+    bf1_victim_color_bf1_red = {
+        en = "Classic BF1 Red",
+        ["zh-cn"] = "经典战地 1 红",
+    },
+    bf1_victim_color_enemy_tier = {
+        en = "By Enemy Tier",
+        ["zh-cn"] = "按敌方阶层着色",
+    },
+    bf1_boss_icon_enabled = {
+        en = "Use Battlefield 1 Gear Icon for Boss Kills",
+        ["zh-cn"] = "击杀 Boss 时使用战地 1 旋转齿轮图标",
+    },
+    kill_icon_transparency_bf1 = {
+        en = "BF1 Icon Transparency",
+        ["zh-cn"] = "BF1 图标透明度",
+    },
+    bf1_bg_opacity = {
+        en = "BF1 Banner Background Opacity",
+        ["zh-cn"] = "BF1 横幅底框不透明度",
+    },
+    bf1_normal_color_r = {
+        en = "BF1 Normal Icon Color - Red",
+        ["zh-cn"] = "BF1 普通图标颜色 - 红",
+    },
+    bf1_normal_color_g = {
+        en = "BF1 Normal Icon Color - Green",
+        ["zh-cn"] = "BF1 普通图标颜色 - 绿",
+    },
+    bf1_normal_color_b = {
+        en = "BF1 Normal Icon Color - Blue",
+        ["zh-cn"] = "BF1 普通图标颜色 - 蓝",
+    },
+    bf1_headshot_color_r = {
+        en = "BF1 Headshot Icon Color - Red",
+        ["zh-cn"] = "BF1 爆头图标颜色 - 红",
+    },
+    bf1_headshot_color_g = {
+        en = "BF1 Headshot Icon Color - Green",
+        ["zh-cn"] = "BF1 爆头图标颜色 - 绿",
+    },
+    bf1_headshot_color_b = {
+        en = "BF1 Headshot Icon Color - Blue",
+        ["zh-cn"] = "BF1 爆头图标颜色 - 蓝",
+    },
+    bf1_boss_color_r = {
+        en = "BF1 Boss Icon Color - Red",
+        ["zh-cn"] = "BF1 Boss 图标颜色 - 红",
+    },
+    bf1_boss_color_g = {
+        en = "BF1 Boss Icon Color - Green",
+        ["zh-cn"] = "BF1 Boss 图标颜色 - 绿",
+    },
+    bf1_boss_color_b = {
+        en = "BF1 Boss Icon Color - Blue",
+        ["zh-cn"] = "BF1 Boss 图标颜色 - 蓝",
+    },
+    kill_icon_vertical_position_bf1 = {
+        en = "BF1 Icon Vertical Position",
+        ["zh-cn"] = "BF1 图标垂直位置",
+    },
+    kill_icon_horizontal_position_bf1 = {
+        en = "BF1 Icon Horizontal Position",
+        ["zh-cn"] = "BF1 图标水平位置",
+    },
+    kill_icon_size_bf1 = {
+        en = "BF1 Icon Size",
+        ["zh-cn"] = "BF1 图标大小",
+    },
+    kill_icon_duration_bf1 = {
+        en = "BF1 Icon Display Duration",
+        ["zh-cn"] = "BF1 图标显示时长",
+    },
+    bf1_fallback_enemy = {
+        en = "ENEMY",
+        ["zh-cn"] = "敌人",
+    },
+    bf1_weapon_unknown = {
+        en = "COMBAT",
+        ["zh-cn"] = "战斗击杀",
+    },
+    bf1_weapon_companion_dog = {
+        en = "Cyber-Mastiff",
+        ["zh-cn"] = "赛博猎犬",
+    },
+    bf1_weapon_servo_skull = {
+        en = "Servo-Skull",
+        ["zh-cn"] = "伺服颅骨",
+    },
+    bf1_weapon_explosion = {
+        en = "Explosion",
+        ["zh-cn"] = "爆炸",
+    },
+    bf1_weapon_dot_bleeding = {
+        en = "Bleed",
+        ["zh-cn"] = "流血",
+    },
+    bf1_weapon_dot_burning = {
+        en = "Burn",
+        ["zh-cn"] = "燃烧",
+    },
+    bf1_weapon_dot_warpfire = {
+        en = "Soulblaze",
+        ["zh-cn"] = "灵火",
+    },
+    bf1_weapon_dot_toxin = {
+        en = "Toxin",
+        ["zh-cn"] = "毒素",
+    },
+    bf1_weapon_dot_electrocution = {
+        en = "Electrocution",
+        ["zh-cn"] = "电击",
+    },
+    bf1_weapon_dot_corruption = {
+        en = "Corruption",
+        ["zh-cn"] = "腐化",
+    },
+    bf1_weapon_dot_generic = {
+        en = "Damage Over Time",
+        ["zh-cn"] = "持续伤害",
     },
     icon_settings_cf = {
         en = "CrossFire Icon Settings (requires Killstreak)",

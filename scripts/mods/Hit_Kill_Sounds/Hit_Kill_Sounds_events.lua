@@ -1,4 +1,4 @@
--- luacheck: globals get_mod Mods Managers ScriptUnit CLASS Unit Vector3
+-- luacheck: globals get_mod Mods Managers ScriptUnit CLASS Unit Vector3 Localize
 local HKS = get_mod("Hit_Kill_Sounds")
 
 HKS.HitKillSoundsEvents = {}
@@ -26,7 +26,230 @@ local AUDIO_PRIORITY = AudioBackend and AudioBackend.PRIORITY or {
 local AttackSettings = require("scripts/settings/damage/attack_settings")
 local DamageSettings = require("scripts/settings/damage/damage_settings")
 local Breed = require("scripts/utilities/breed")
+local Items = require("scripts/utilities/items")
 local damage_types = DamageSettings.damage_types
+
+local ABILITY_DISPLAY_ALIASES = {
+    psyker_discharge_shout_improved = "psyker_discharge_shout",
+    zealot_targeted_dash_improved = "zealot_targeted_dash",
+    zealot_targeted_dash_improved_double = "zealot_targeted_dash",
+    ogryn_charge_cooldown_reduction = "ogryn_charge",
+    ogryn_charge_damage = "ogryn_charge",
+    ogryn_charge_increased_distance = "ogryn_charge",
+    ogryn_charge_bleed = "ogryn_charge",
+    ogryn_grenade_box_cluster = "ogryn_grenade_box",
+    veteran_combat_ability_stance_improved = "veteran_combat_ability_stance",
+    zealot_invisibility_improved = "zealot_invisibility",
+    psyker_force_field_improved = "psyker_force_field",
+    adamant_shout_improved = "adamant_shout",
+    adamant_grenade_improved = "adamant_grenade",
+    broker_ability_focus_improved = "broker_ability_focus",
+    broker_flash_grenade_improved = "broker_flash_grenade",
+    cryptic_discharge_base = "cryptic_discharge",
+}
+
+local BLITZ_DAMAGE_PROFILES = {
+    -- Veteran
+    frag_grenade = "veteran_frag_grenade",
+    close_frag_grenade = "veteran_frag_grenade",
+    frag_grenade_impact = "veteran_frag_grenade",
+    krak_grenade = "veteran_krak_grenade",
+    close_krak_grenade = "veteran_krak_grenade",
+    krak_grenade_impact = "veteran_krak_grenade",
+    smoke_grenade = "veteran_smoke_grenade",
+    -- Zealot
+    shock_grenade = "zealot_shock_grenade",
+    shock_grenade_stun_interval = "zealot_shock_grenade",
+    fire_grenade_impact = "zealot_fire_grenade",
+    flame_grenade_liquid_area_fire_burning = "zealot_fire_grenade",
+    zealot_throwing_knives = "zealot_throwing_knives",
+    -- Ogryn
+    ogryn_grenade = "ogryn_grenade_frag",
+    close_ogryn_grenade = "ogryn_grenade_frag",
+    ogryn_grenade_impact = "ogryn_grenade_frag",
+    ogryn_grenade_box_impact = "ogryn_grenade_box",
+    ogryn_grenade_box_cluster_impact = "ogryn_grenade_box",
+    ogryn_box_cluster_frag_grenade = "ogryn_grenade_box",
+    ogryn_box_cluster_close_frag_grenade = "ogryn_grenade_box",
+    ogryn_friendly_rock_impact = "ogryn_grenade_friend_rock",
+    -- Psyker
+    psyker_smite_kill = "psyker_smite",
+    psyker_smite_stagger = "psyker_smite",
+    psyker_smite_light = "psyker_smite",
+    psyker_smite_heavy = "psyker_smite",
+    psyker_biomancer_soul = "psyker_smite",
+    psyker_throwing_knives = "psyker_throwing_knives",
+    psyker_throwing_knives_aimed = "psyker_throwing_knives",
+    psyker_throwing_knives_aimed_pierce = "psyker_throwing_knives",
+    psyker_throwing_knives_pierce = "psyker_throwing_knives",
+    psyker_throwing_knives_psychic_fortress = "psyker_throwing_knives",
+    psyker_protectorate_chain_lighting = "psyker_chain_lightning",
+    psyker_protectorate_chain_lighting_fast = "psyker_chain_lightning",
+    psyker_protectorate_spread_chain_lightning_interval = "psyker_chain_lightning",
+    psyker_protectorate_channel_chain_lightning_activated = "psyker_chain_lightning",
+    psyker_heavy_swings_shock = "psyker_chain_lightning",
+    psyker_stun = "psyker_chain_lightning",
+    chain_lightning_killing_blow = "psyker_chain_lightning",
+    -- Arbites (adamant)
+    adamant_grenade = "adamant_grenade",
+    close_adamant_grenade = "adamant_grenade",
+    adamant_grenade_impact = "adamant_grenade",
+    whistle_explosion = "adamant_whistle",
+    close_whistle_explosion = "adamant_whistle",
+    shock_mine_self_destruct = "adamant_shock_mine",
+    -- Hive Scum (broker)
+    broker_flash_grenade = "broker_flash_grenade",
+    broker_flash_grenade_close = "broker_flash_grenade",
+    broker_flash_grenade_impact = "broker_flash_grenade",
+    broker_tox_grenade = "broker_tox_grenade",
+    broker_missile_launcher_explosion = "broker_missile_launcher",
+    broker_missile_launcher_explosion_close = "broker_missile_launcher",
+    broker_missile_launcher_impact = "broker_missile_launcher",
+    missile_launcher_knockback = "broker_missile_launcher",
+    -- Cryptic
+    arc_grenade = "arc_grenade",
+    arc_grenade_chain_jump_damage = "arc_grenade",
+    cryptic_arc_grenade_shock_damage = "arc_grenade",
+    force_field_explosion_damage = "cryptic_force_field",
+    force_field_chain_jump_damage = "cryptic_force_field",
+}
+
+local COMBAT_ABILITY_DAMAGE_PROFILES = {
+    shout_stagger_veteran = "veteran_combat_ability_shout",
+    zealot_dash_impact = "zealot_targeted_dash",
+    zealot_dash_health_to_damage_transfer = "zealot_targeted_dash",
+    zealot_preacher_ability_close = "zealot_relic",
+    zealot_preacher_ability_far = "zealot_relic",
+    zealot_channel_stagger = "zealot_relic",
+    ogryn_charge_impact = "ogryn_charge",
+    ogryn_charge_finish = "ogryn_charge",
+    ogryn_charge_impact_damage = "ogryn_charge",
+    ogryn_charge_finish_damage = "ogryn_charge",
+    shout_stagger_ogryn_taunt = "ogryn_taunt_shout",
+    psyker_biomancer_shout = "psyker_discharge_shout",
+    psyker_biomancer_shout_damage = "psyker_discharge_shout",
+    psyker_shield_stagger = "psyker_force_field",
+    adamant_shout = "adamant_shout",
+    adamant_shout_damage = "adamant_shout",
+    adamant_charge_impact = "adamant_charge",
+    adamant_charge_damage = "adamant_charge",
+    broker_stimm_field = "broker_ability_stimm_field",
+    broker_stimm_field_close = "broker_ability_stimm_field",
+    broker_punk_rage_shout = "broker_ability_punk_rage",
+    cryptic_discharge_explosion = "cryptic_discharge",
+    cryptic_discharge_weapon_malfunction_explosion = "cryptic_discharge",
+    cryptic_discharge_shock_damage = "cryptic_discharge",
+    discharge_chain_jump_damage = "cryptic_discharge",
+    chordclaw_main = "cryptic_chordclaw",
+    chordclaw_light = "cryptic_chordclaw",
+    chordclaw_horizontal = "cryptic_chordclaw",
+    chordclaw_stab_bleed = "cryptic_chordclaw",
+    chordclaw_sticky = "cryptic_chordclaw",
+    chordclaw_sticky_dodge = "cryptic_chordclaw",
+}
+
+local WEAPON_EXPLOSION_SLOT_BY_PROFILE = {
+    ogryn_thumper_p1_m2_default = "slot_secondary",
+    ogryn_thumper_p1_m2_close = "slot_secondary",
+    ogryn_thumper_p1_m2_default_instant = "slot_secondary",
+    ogryn_thumper_p1_m2_close_instant = "slot_secondary",
+    thumper_grenade_impact = "slot_secondary",
+    close_gauntlet_demolitions = "slot_secondary",
+    close_special_gauntlet_demolitions = "slot_secondary",
+    default_gauntlet_demolitions = "slot_secondary",
+    bolter_kill_explosion = "slot_secondary",
+    bolter_m2_kill_explosion = "slot_secondary",
+    bolter_m2_stop_explosion = "slot_secondary",
+    bolter_stop_explosion = "slot_secondary",
+    boltpistol_kill_explosion = "slot_secondary",
+    boltpistol_m2_kill_explosion = "slot_secondary",
+    boltpistol_m2_stop_explosion = "slot_secondary",
+    boltpistol_stop_explosion = "slot_secondary",
+    plasma_demolition = "slot_secondary",
+    plasma_overheat = "slot_secondary",
+    close_charged_plasma_demolition_p1_m2 = "slot_secondary",
+    close_light_plasma_demolition = "slot_secondary",
+    close_light_plasma_demolition_p1_m2 = "slot_secondary",
+    default_plasma_demolition = "slot_secondary",
+    far_charged_plasma_demolition_p1_m2 = "slot_secondary",
+    far_light_plasma_demolition_p1_m2 = "slot_secondary",
+    light_plasma_demolition = "slot_secondary",
+    force_staff_demolition_close = "slot_secondary",
+    force_staff_demolition_default = "slot_secondary",
+    close_force_staff_demolition = "slot_secondary",
+    default_force_staff_demolition = "slot_secondary",
+    close_force_staff_p4_demolition = "slot_secondary",
+    force_staff_p4_demolition = "slot_secondary",
+    needlepistol_explosion_parent = "slot_secondary",
+    phosphor_pistol_backblast_explosion = "slot_secondary",
+    primer_explosion = "slot_secondary",
+    primer_explosion_close = "slot_secondary",
+    primer_gas = "slot_secondary",
+    primer_stun = "slot_secondary",
+    powermaul_explosion = "slot_primary",
+    powermaul_explosion_outer = "slot_primary",
+    powermaul_explosion_m2 = "slot_primary",
+    powermaul_explosion_outer_m2 = "slot_primary",
+    ogryn_powermaul_explosion = "slot_primary",
+    ogryn_powermaul_explosion_outer = "slot_primary",
+    forcesword_explosion = "slot_primary",
+    forcesword_explosion_outer = "slot_primary",
+    powersword_explosion = "slot_primary",
+    powersword_explosion_outer = "slot_primary",
+    trait_powersword_2h_p1_trade_overheat_lockout_for_damage = "slot_primary",
+}
+
+local PROP_EXPLOSION_PROFILES = {
+    barrel_explosion = true,
+    barrel_explosion_close = true,
+    fire_barrel_explosion = true,
+    fire_barrel_explosion_close = true,
+    promethium_barrel_explosion = true,
+    promethium_barrel_explosion_close = true,
+    flamer_backpack_explosion = true,
+    flamer_backpack_explosion_close = true,
+    interrupted_flamer_backpack_explosion = true,
+    interrupted_flamer_backpack_explosion_close = true,
+    breach_charge_explosion = true,
+    expeditions_big_grenade = true,
+    expeditions_big_grenade_close = true,
+    attack_valkyrie_missile_explosion = true,
+    attack_valkyrie_missile_explosion_close = true,
+    expeditions_lightning_strike_explosion = true,
+    expeditions_lightning_strike_explosion_close = true,
+}
+
+local ability_display_name_cache = nil
+
+local function get_ability_display_name_map()
+    if ability_display_name_cache ~= nil then
+        return ability_display_name_cache
+    end
+
+    local map = {}
+    local ok, archetype_talents = pcall(require, "scripts/settings/ability/archetype_talents/archetype_talents")
+    if ok and type(archetype_talents) == "table" then
+        for _, talents in pairs(archetype_talents) do
+            if type(talents) == "table" then
+                for talent_name, talent in pairs(talents) do
+                    local player_ability = type(talent) == "table" and talent.player_ability
+                    local ability = type(player_ability) == "table" and player_ability.ability
+                    local ability_name = type(ability) == "table" and ability.name
+                    local display_name = type(talent) == "table" and talent.display_name
+                    if type(ability_name) == "string" and type(display_name) == "string" and
+                        string.sub(display_name, 1, 4) == "loc_" then
+                        if not map[ability_name] or talent_name == ability_name then
+                            map[ability_name] = display_name
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    ability_display_name_cache = map
+    return map
+end
 
 -- 只保留有明确持续伤害语义的通用 damage_type。electrocution 必须通过
 -- damage_profile.name 精确判定，不能把所有电击伤害都当成 DoT。
@@ -227,12 +450,12 @@ end
 
 -- §21/§23 BF4 文字击杀信息使用自己的目标和有效事件状态。
 -- 这里不能读取 CF 音效、CF 图标、BF5 音效或 BF5 图标开关。
-local function add_bf4_score_feed(breed_or_nil, is_headshot, bf4_feed_eligible, bf4_next_count)
+local function add_bf4_score_feed(breed_or_nil, is_headshot, bf4_feed_eligible, bf4_next_count, extra_context)
     if not bf4_feed_eligible or not ScoreFeed then
         return false
     end
 
-    return ScoreFeed.add_kill(breed_or_nil, is_headshot, bf4_next_count) == true
+    return ScoreFeed.add_kill(breed_or_nil, is_headshot, bf4_next_count, extra_context) == true
 end
 
 local function _scan_cf_assets()
@@ -1320,6 +1543,305 @@ local function can_play_hit()
     return false
 end
 
+local function safe_game_localize(key)
+    if type(key) ~= "string" or key == "" or type(Localize) ~= "function" then
+        return nil
+    end
+    local ok, text = pcall(Localize, key)
+    if ok and type(text) == "string" and text ~= "" then
+        return text
+    end
+    return nil
+end
+
+local function is_boss_target(breed_or_nil)
+    if not breed_or_nil then
+        return false
+    end
+    local tags = breed_or_nil.tags or {}
+    return breed_or_nil.is_boss == true or breed_or_nil.boss == true or
+        tags.monster == true or tags.captain == true
+end
+
+local function resolve_bf1_dot_weapon_name(damage_profile)
+    local profile_name = damage_profile and damage_profile.name
+    local damage_type = damage_profile and damage_profile.damage_type
+    if ELECTROCUTION_DOT_PROFILES[profile_name] then
+        return HKS:localize("bf1_weapon_dot_electrocution")
+    elseif damage_type == damage_types.bleeding or profile_name == "bleeding" then
+        return HKS:localize("bf1_weapon_dot_bleeding")
+    elseif damage_type == damage_types.warpfire then
+        return HKS:localize("bf1_weapon_dot_warpfire")
+    elseif damage_type == damage_types.burning or
+        (type(profile_name) == "string" and string.find(profile_name, "burn", 1, true)) then
+        return HKS:localize("bf1_weapon_dot_burning")
+    elseif damage_type == damage_types.toxin or
+        (type(profile_name) == "string" and (string.find(profile_name, "toxin", 1, true) or
+            string.find(profile_name, "gas", 1, true))) then
+        return HKS:localize("bf1_weapon_dot_toxin")
+    elseif damage_type == damage_types.corruption or damage_type == damage_types.grimoire or
+        (type(profile_name) == "string" and string.find(profile_name, "corrupt", 1, true)) then
+        return HKS:localize("bf1_weapon_dot_corruption")
+    end
+    return HKS:localize("bf1_weapon_dot_generic")
+end
+
+local function resolve_slot_weapon_name(visual_loadout_ext, slot_name)
+    if not visual_loadout_ext or not slot_name or slot_name == "none" then
+        return nil
+    end
+    local ok_item, item = pcall(visual_loadout_ext.item_from_slot, visual_loadout_ext, slot_name)
+    if not ok_item or not item then
+        return nil
+    end
+    if Items and Items.weapon_card_display_name then
+        local ok_card, card_name = pcall(Items.weapon_card_display_name, item)
+        if ok_card and type(card_name) == "string" and card_name ~= "" and card_name ~= "n/a" then
+            return card_name
+        end
+    end
+    if Items and Items.display_name then
+        local ok_disp, disp_name = pcall(Items.display_name, item)
+        if ok_disp and type(disp_name) == "string" and disp_name ~= "" and
+            disp_name ~= "n/a" and disp_name ~= "-" then
+            return disp_name
+        end
+    end
+    return nil
+end
+
+local function resolve_victim_name(breed_or_nil)
+    return (breed_or_nil and safe_game_localize(breed_or_nil.display_name)) or
+        HKS:localize("bf1_fallback_enemy")
+end
+
+local function get_equipped_ability_name(attacking_unit, ability_type)
+    local ability_ext = attacking_unit and ScriptUnit.has_extension(attacking_unit, "ability_system")
+    if not ability_ext or not ability_ext.equipped_abilities then
+        return nil
+    end
+
+    local ok_ab, abilities = pcall(ability_ext.equipped_abilities, ability_ext)
+    local ability = ok_ab and abilities and abilities[ability_type]
+    return type(ability) == "table" and ability.name or nil
+end
+
+local function localize_ability_by_name(ability_name)
+    if type(ability_name) ~= "string" or ability_name == "" then
+        return nil
+    end
+
+    local display_map = get_ability_display_name_map()
+    local canonical = ABILITY_DISPLAY_ALIASES[ability_name] or ability_name
+    local loc_key = display_map[canonical] or display_map[ability_name]
+    return safe_game_localize(loc_key)
+end
+
+local function resolve_ability_label(attacking_unit, ability_type, explicit_ability_name)
+    local label = localize_ability_by_name(explicit_ability_name)
+    if label then
+        return label
+    end
+
+    local equipped_name = get_equipped_ability_name(attacking_unit, ability_type)
+    label = localize_ability_by_name(equipped_name)
+    if label then
+        return label
+    end
+
+    return nil
+end
+
+local function resolve_kill_weapon_name(
+    damage_profile, attacking_unit, attack_type, is_dot_damage, is_companion_attack
+)
+    if is_companion_attack then
+        if attack_type == AttackSettings.attack_types.companion_dog then
+            return HKS:localize("bf1_weapon_companion_dog")
+        end
+        return HKS:localize("bf1_weapon_servo_skull")
+    end
+
+    local profile_name = damage_profile and damage_profile.name
+
+    -- 1. Unambiguous Blitz (grenade / psychic blitz / throwing knives) profiles first.
+    local blitz_ability = profile_name and BLITZ_DAMAGE_PROFILES[profile_name]
+    if blitz_ability then
+        local blitz_label = resolve_ability_label(attacking_unit, "grenade_ability", blitz_ability)
+        if blitz_label then
+            return blitz_label
+        end
+        if attack_type == AttackSettings.attack_types.explosion then
+            return HKS:localize("bf1_weapon_explosion")
+        end
+    end
+
+    -- 2. Unambiguous Combat Ability profiles (shouts, charges, discharge, chordclaw, etc.).
+    local combat_ability = profile_name and COMBAT_ABILITY_DAMAGE_PROFILES[profile_name]
+    if combat_ability then
+        local combat_label = resolve_ability_label(attacking_unit, "combat_ability", combat_ability)
+        if combat_label then
+            return combat_label
+        end
+    end
+
+    -- 3. Generic DoT profiles (bleed, burn, warpfire, toxin, weapon/environmental electrocution).
+    if is_dot_damage then
+        return resolve_bf1_dot_weapon_name(damage_profile)
+    end
+
+    -- 4. Environmental / prop / barrel explosions.
+    if profile_name and PROP_EXPLOSION_PROFILES[profile_name] then
+        return HKS:localize("bf1_weapon_explosion")
+    end
+
+    local unit_data_ext = attacking_unit and ScriptUnit.has_extension(attacking_unit, "unit_data_system")
+    local visual_loadout_ext = attacking_unit and ScriptUnit.has_extension(attacking_unit, "visual_loadout_system")
+    local inventory = unit_data_ext and unit_data_ext:read_component("inventory")
+    local wielded_slot = inventory and inventory.wielded_slot
+
+    -- 5. Weapon-specific explosions (e.g. Rumbler, Trauma Staff, Plasma, Power Maul, Force Sword).
+    local weapon_explosion_slot = profile_name and WEAPON_EXPLOSION_SLOT_BY_PROFILE[profile_name]
+    if weapon_explosion_slot then
+        local weapon_exp_name = resolve_slot_weapon_name(visual_loadout_ext, weapon_explosion_slot)
+        if weapon_exp_name then
+            return weapon_exp_name
+        end
+    end
+
+    -- 6. Shared default_grenade profile (Zealot Immolation pop vs weapon blessing minion explosions).
+    if profile_name == "default_grenade" then
+        local equipped_grenade = get_equipped_ability_name(attacking_unit, "grenade_ability")
+        if equipped_grenade == "zealot_fire_grenade" and wielded_slot ~= "slot_secondary" then
+            local fire_label = resolve_ability_label(attacking_unit, "grenade_ability", "zealot_fire_grenade")
+            if fire_label then
+                return fire_label
+            end
+        end
+        local ranged_name = resolve_slot_weapon_name(visual_loadout_ext, "slot_secondary")
+        if ranged_name then
+            return ranged_name
+        end
+        return HKS:localize("bf1_weapon_explosion")
+    end
+
+    -- 7. Remaining shout kills map to combat ability; remaining unknown explosions map to blitz or explosion.
+    if attack_type == AttackSettings.attack_types.shout then
+        local shout_label = resolve_ability_label(attacking_unit, "combat_ability", nil)
+        if shout_label then
+            return shout_label
+        end
+    end
+
+    if attack_type == AttackSettings.attack_types.explosion then
+        if wielded_slot == "slot_grenade_ability" then
+            local grenade_label = resolve_ability_label(attacking_unit, "grenade_ability", nil)
+            if grenade_label then
+                return grenade_label
+            end
+        elseif wielded_slot == "slot_combat_ability" then
+            local combat_label = resolve_ability_label(attacking_unit, "combat_ability", nil)
+            if combat_label then
+                return combat_label
+            end
+        end
+        return HKS:localize("bf1_weapon_explosion")
+    end
+
+    -- 8. If currently wielding an ability slot and not a standard melee/ranged attack, resolve ability name.
+    if wielded_slot == "slot_grenade_ability" and
+        attack_type ~= AttackSettings.attack_types.melee and
+        attack_type ~= AttackSettings.attack_types.ranged then
+        local grenade_label = resolve_ability_label(attacking_unit, "grenade_ability", nil)
+        if grenade_label then
+            return grenade_label
+        end
+    elseif wielded_slot == "slot_combat_ability" and
+        attack_type ~= AttackSettings.attack_types.melee and
+        attack_type ~= AttackSettings.attack_types.ranged then
+        local combat_label = resolve_ability_label(attacking_unit, "combat_ability", nil)
+        if combat_label then
+            return combat_label
+        end
+    end
+
+    -- 9. Regular melee / ranged weapons.
+    local preferred_slot = wielded_slot
+    if attack_type == AttackSettings.attack_types.melee and preferred_slot ~= "slot_primary" then
+        preferred_slot = "slot_primary"
+    elseif attack_type == AttackSettings.attack_types.ranged and preferred_slot ~= "slot_secondary" then
+        preferred_slot = "slot_secondary"
+    end
+
+    local weapon_name = resolve_slot_weapon_name(visual_loadout_ext, preferred_slot)
+    if not weapon_name and wielded_slot and wielded_slot ~= preferred_slot then
+        weapon_name = resolve_slot_weapon_name(visual_loadout_ext, wielded_slot)
+    end
+
+    return weapon_name or HKS:localize("bf1_weapon_unknown")
+end
+
+local function resolve_bf1_kill_context(
+    damage_profile, attacked_unit, attacking_unit, breed_or_nil,
+    is_kill_headshot, damage, attack_type, is_dot_damage, is_companion_attack
+)
+    local tags = breed_or_nil and breed_or_nil.tags or {}
+    local is_boss = is_boss_target(breed_or_nil)
+    local is_special = breed_or_nil and (breed_or_nil.special == true or tags.special == true) or false
+    local is_elite = breed_or_nil and (breed_or_nil.elite == true or tags.elite == true) or false
+
+    local enemy_tier = "normal"
+    local base_score = 100
+    local priority = is_kill_headshot and 2 or 1
+    if is_boss then
+        enemy_tier = "boss"
+        base_score = 500
+        priority = 5
+    elseif is_special then
+        enemy_tier = "special"
+        base_score = 250
+        priority = 4
+    elseif is_elite then
+        enemy_tier = "elite"
+        base_score = 200
+        priority = 3
+    end
+
+    local kill_type = "default"
+    if is_boss and HKS:get("bf1_boss_icon_enabled") ~= false then
+        kill_type = "boss"
+    elseif is_kill_headshot then
+        kill_type = "headshot"
+    end
+
+    local victim_name = resolve_victim_name(breed_or_nil)
+    local weapon_name = resolve_kill_weapon_name(
+        damage_profile, attacking_unit, attack_type, is_dot_damage, is_companion_attack
+    )
+
+    local max_health = 0
+    local health_ext = attacked_unit and ScriptUnit.has_extension(attacked_unit, "health_system")
+    if health_ext and health_ext.max_health then
+        local ok_hp, hp_val = pcall(health_ext.max_health, health_ext)
+        if ok_hp and type(hp_val) == "number" and hp_val > 0 then
+            max_health = hp_val
+        end
+    end
+
+    return {
+        kill_type = kill_type,
+        is_headshot = is_kill_headshot == true,
+        is_boss = is_boss,
+        enemy_tier = enemy_tier,
+        victim_name = victim_name,
+        weapon_name = weapon_name,
+        score = base_score + (is_kill_headshot and 50 or 0),
+        max_health = max_health,
+        damage = tonumber(damage) or 0,
+        priority = priority,
+    }
+end
+
 -- 处理攻击结果的内部函数
 local function handle_attack_result(damage_profile, attacked_unit, attacking_unit, _attack_direction, _hit_world_position, hit_weakspot, damage, attack_result, attack_type, _damage_efficiency, _is_critical_strike)
     -- 总开关关闭时静默
@@ -1430,18 +1952,28 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
             clear_valorant_icon_state()
         end
 
-        -- BF4 uses a pure preview to build the complete batch.  The counter is
-        -- accepted only after the batch has been inserted successfully.
+        -- BF4 works independently of killstreak_enabled; killstreak only adds the
+        -- optional MULTI KILL bonus row.
         local bf4_eligible = ScoreFeed and ScoreFeed.is_enabled and
             ScoreFeed.is_enabled() and bf4_feed_target_valid and
             dot_icon_allowed and companion_kill_icon_allowed
         local bf4_next_count = (killstreak_enabled and bf4_eligible and bf4_feed_counter and
             bf4_feed_counter.preview_next) and bf4_feed_counter:preview_next(now) or nil
+        local bf4_extra_context = nil
+        if bf4_eligible then
+            bf4_extra_context = {
+                victim_name = resolve_victim_name(breed_or_nil),
+                weapon_name = resolve_kill_weapon_name(
+                    damage_profile, attacking_unit, attack_type, is_dot_damage, is_companion_attack
+                ),
+            }
+        end
         local bf4_event_added = add_bf4_score_feed(
             breed_or_nil,
             is_kill_headshot,
             bf4_eligible,
-            bf4_next_count
+            bf4_next_count,
+            bf4_extra_context
         )
         if bf4_event_added and killstreak_enabled then
             accept_counter(bf4_feed_counter, now, true)
@@ -1505,10 +2037,30 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
             play_kill_sound(is_kill_headshot)
         end
 
-        -- BF5 图标：仅当 CF 图标未激活时（叠加 kill_icon_target_valid）
-        if HKS:get("kill_icon_style") == "BF5" and not cf_icon_active and not valorant_icon_active and kill_icon_target_valid and dot_icon_allowed and
-            companion_kill_icon_allowed and HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
-            HKS.HitKillIconManager.show_icon(is_kill_headshot)
+        -- BF5 图标：仅当 CF / Valorant 图标未激活时（叠加 kill_icon_target_valid）
+        local is_bfv_boss = is_boss_target(breed_or_nil)
+        if HKS:get("kill_icon_style") == "BF5" and not cf_icon_active and not valorant_icon_active and
+            kill_icon_target_valid and dot_icon_allowed and companion_kill_icon_allowed and
+            HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
+            HKS.HitKillIconManager.show_icon(is_kill_headshot, is_bfv_boss)
+        end
+
+        -- BF1 图标：仅当 CF / Valorant 图标未激活时（叠加 kill_icon_target_valid）
+        if HKS:get("kill_icon_style") == "BF1" and not cf_icon_active and not valorant_icon_active and
+            kill_icon_target_valid and dot_icon_allowed and companion_kill_icon_allowed and
+            HKS:get("kill_icon_enabled") and HKS.HitKillBF1Manager then
+            local bf1_ctx = resolve_bf1_kill_context(
+                damage_profile,
+                attacked_unit,
+                attacking_unit,
+                breed_or_nil,
+                is_kill_headshot,
+                damage,
+                attack_type,
+                is_dot_damage,
+                is_companion_attack
+            )
+            HKS.HitKillBF1Manager.push_kill(bf1_ctx, now)
         end
 
         return
