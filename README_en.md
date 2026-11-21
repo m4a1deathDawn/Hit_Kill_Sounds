@@ -1,8 +1,10 @@
 # Hit/Kill Sounds
 
+[English](README_en.md) | [简体中文](README.md)
+
 Add hit sounds, kill sounds and kill icons inspired by several games to Warhammer 40,000: Darktide. Optional features include CrossFire and Valorant killstreak feedback, a Battlefield 4-style text feed and score tally, and Mourningstar hub BGM.
 
-**Current version: v1.5.5**
+**Current version: v1.5.6**
 
 ## Installation and Quick Start
 
@@ -35,7 +37,7 @@ Hit sounds, kill sounds and kill icons can be enabled independently. Normal, wea
 
 ### BFV Kill Icons
 
-The BFV style queues kill icons and moves existing icons when a new kill arrives. It uses 10 main slots and up to 2 leaving-transition slots, with entry, headshot ring and fade animations.
+The BFV style queues `512×512` HD Battlefield V skull kill icons (unified V-notch normal skull and lightning-crack headshot skull) and moves existing icons when a new kill arrives. It uses 10 main slots and up to 2 leaving-transition slots, featuring normal entry slam, headshot two-stage micro-rebound (scaled `+4%` larger) with a warm-white impact flash, a built-in dual-ring morphing headshot shockwave (bold impact ring handing off to a crisp thin outer ring), and centered contraction during fade-out.
 
 Adjust size, opacity, normal/headshot colors, horizontal/vertical position and display duration. Size ranges from 0.5 to 2.0 times the base size; display duration ranges from 1.0 to 3.0 seconds.
 
@@ -259,7 +261,7 @@ Audio normally uses SimpleAudio; icons use SimpleAssets. The old HTTP player rem
 
 v1.5.2 sets the short-sound voice limits managed by HKS to 5 hit, 5 kill and 10 total. These are not global limits for SimpleAudio or BGM. The pending queue remains 10, with the existing priority and replacement rules.
 
-**Current validation:** 56 local Lua tests have passed. Full-script luacheck reports 0 errors and retains 44 line-length warnings. `git diff --check` reports no whitespace errors. The user has completed the current in-game test, and the Valorant arc direction, counters and headshot emblem adjustments have not revealed any issues.
+**Current validation:** For v1.5.6, all 5 baked `512×512` BFV HD textures have been verified, and luacheck on the modified scripts reports 0 errors (`Hit_Kill_Sounds_hud.lua` and `Hit_Kill_Sounds_assets_backend.lua` have 0 warnings; `Hit_Kill_Sounds_localization.lua` retains its 2 pre-existing line-length warnings). The user has completed in-game testing and reports no issues.
 
 ## Asset Sources and Acknowledgments
 
@@ -269,7 +271,7 @@ Built-in sounds and icons remain the property of their respective rights holders
 - Call of Duty sounds: Activision.
 - The Finals sounds: Embark Studios.
 - Overwatch sounds: Blizzard Entertainment.
-- Valorant kill icon and animation references: the [gd656killicon](https://github.com/MinecraftGD656/gd656killicon) project.
+- Valorant kill icon/animation references: the [gd656killicon](https://github.com/MinecraftGD656/gd656killicon) project.
 - Hit and kill sounds from various games: extracted from the [Custom Hitmarker](https://mod.io/g/drg/m/custom-hitmarker) mod.
 - Other game-themed resources belong to their respective games; the CF killstreak system was ported from EBuyToDeep_KillFeedBack.
 
@@ -281,6 +283,14 @@ Built-in sounds and icons remain the property of their respective rights holders
 This Mod is provided for educational and personal use. Before replacing, sharing or redistributing personal audio, make sure you have the relevant permissions. Do not redistribute unauthorized commercial audio with the Mod.
 
 ## Changelog
+
+### v1.5.6
+
+- **BFV HD kill icon upgrade:** Replaced the Battlefield V kill icons with Lanczos-3 resampled `512×512` fringe-free HD textures (`kill_normal.png`, `kill_headshot.png`, `kill_circle_bold.png`, `kill_circle_thin.png`, plus a `kill_circle.png` compatibility copy). Unified the vector silhouette and pixel alignment of the V-notch normal skull and lightning-crack headshot skull with `16px` transparent safety padding to prevent non-mipmapped downsampling shimmer and UV edge clipping.
+- **Built-in dual-ring morphing headshot shockwave:** Upgraded `circle_icon` to a concentric dual-pass widget where an inner bold ring (`0.00s–0.24s`, `0.95x → 2.40x` fast fade) hands off to an outer thin ring (`0.00s–0.40s`, `1.05x → 3.45x` crisp expansion), reproducing Battlefield V's stroke-thinning shockwave effect in Darktide's raster HUD.
+- **BFV impact kinetics and headshot flash:** Normal kills use a snappy `0.16s` entry slam (`1.80x → 1.00x`); headshot kills are scaled `+4%` larger (`1.04x`), use a `0.18s` two-stage micro-rebound (`2.05x → 0.93x → 1.00x`), and flash warm-white over the first `0.10s` before settling into the configured headshot color.
+- **Sub-pixel centering and fade contraction fixes:** Switched widget size and centering offsets to floating-point sub-pixel positioning to eliminate 1px odd/even jitter during scaling; fixed natural fade-out queue contraction (`18%` inward pull during the first 35%) being overwritten per frame, and tightened horizontal queue damping to `exp(-18 * dt)`.
+- **Loading compatibility and validation:** `Hit_Kill_Sounds_assets_backend.lua` loads the four BFV HD textures through SimpleAssets with automatic fallback to `kill_circle.png` and legacy HTTP loading. Modified scripts pass luacheck with 0 errors (`Hit_Kill_Sounds_hud.lua` and `Hit_Kill_Sounds_assets_backend.lua` have 0 warnings; `Hit_Kill_Sounds_localization.lua` retains its 2 pre-existing line-length warnings), and all five `512×512` textures are verified. The user has completed in-game testing and reports no issues.
 
 ### v1.5.5
 
