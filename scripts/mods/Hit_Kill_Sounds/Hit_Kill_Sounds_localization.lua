@@ -4,8 +4,8 @@ return {
         ["zh-cn"] = "命中/击杀音效",
     },
     mod_description = {
-        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.7{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
-        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.7{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
+        en = "Play hit and kill sounds from different games when hitting or killing enemies in Darktide. Also supports kill icons, UserAudio playlist-based Custom Audio Packs and optional hub BGM.\n\n{#color(0,255,0)}Version v1.5.8{#reset()}  {#color(255,255,0)}Author: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}Special thanks to EBuyToDeep for the external audio player solution! Thanks to deluxghost for the SimpleAudio + SimpleAssets solution!{#reset()}",
+        ["zh-cn"] = "在暗潮中命中或击杀敌人时，播放来自不同游戏的命中和击杀音效，并支持击杀图标、UserAudio 播放清单自定义音频包与可选大厅 BGM。\n\n{#color(0,255,0)}版本 v1.5.8{#reset()}  {#color(255,255,0)}作者: m4a1_death-Dawn{#reset()}\n{#color(0,102,255)}感谢 EBuyToDeep 提供的外部音频播放器方案！感谢 deluxghost 提供的 SimpleAudio + SimpleAssets 方案！{#reset()}",
     },
     -- 主开关
     enabled = {
@@ -341,6 +341,50 @@ return {
     kill_icon_boss_color_b = {
         en = "Boss Icon Color - Blue",
         ["zh-cn"] = "Boss 图标颜色 - 蓝",
+    },
+    bf5_text_feedback_enabled = {
+        en = "Enable BF5 Text Kill Feedback",
+        ["zh-cn"] = "启用战地 5 文字击杀信息",
+    },
+    bf5_hit_score_enabled = {
+        en = "Enable Enemy Hit Score (% HP)",
+        ["zh-cn"] = "启用击中敌人加分（按伤血百分比）",
+    },
+    bf5_text_scale = {
+        en = "BF5 Text Feedback Size (50%%-150%%)",
+        ["zh-cn"] = "战地 5 文字信息大小（50%%-150%%）",
+    },
+    bf5_enemy_fallback = {
+        en = "Enemy",
+        ["zh-cn"] = "敌人",
+    },
+    bf5_hit_enemy = {
+        en = "ENEMY HIT",
+        ["zh-cn"] = "命中敌人",
+    },
+    bf5_headshot_bonus = {
+        en = "HEADSHOT",
+        ["zh-cn"] = "爆头击杀",
+    },
+    bf5_double_kill = {
+        en = "DOUBLE KILL",
+        ["zh-cn"] = "双杀",
+    },
+    bf5_triple_kill = {
+        en = "TRIPLE KILL",
+        ["zh-cn"] = "三杀",
+    },
+    bf5_quad_kill = {
+        en = "QUAD KILL",
+        ["zh-cn"] = "四杀",
+    },
+    bf5_five_kill = {
+        en = "FIVE KILL",
+        ["zh-cn"] = "五杀",
+    },
+    bf5_multi_kill = {
+        en = "MULTI KILL",
+        ["zh-cn"] = "多重击杀",
     },
     icon_settings_bf1 = {
         en = "Battlefield 1 Icon Settings",

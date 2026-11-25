@@ -4,44 +4,60 @@ local UIWorkspaceSettings = require("scripts/settings/ui/ui_workspace_settings")
 local UIFontSettings = require("scripts/managers/ui/ui_font_settings")
 local UIWidget = require("scripts/managers/ui/ui_widget")
 
-local BASE_VICTIM_FONT_SIZE = 22
-local BASE_WEAPON_FONT_SIZE = 18
-local BASE_VALUE_FONT_SIZE = 32
-local BASE_COMBO_FONT_SIZE = 14
-local BASE_PAD_X = 14
-local BASE_PAD_Y = 9
-local BASE_ROW_GAP = 3
-local BASE_COL_GAP = 16
-local BASE_ACCENT_W = 3
-local BASE_DIVIDER_W = 1
-local MAX_TEXT_COL_WIDTH = 420
-local MAX_VALUE_WIDTH = 180
-local ICON_TO_BOX_RATIO = 0.80
-local SCREEN_EDGE_MARGIN = 12
+local CFG = {
+    BASE_VICTIM_FONT_SIZE = 22,
+    BASE_WEAPON_FONT_SIZE = 18,
+    BASE_VALUE_FONT_SIZE = 32,
+    BASE_COMBO_FONT_SIZE = 14,
+    BASE_PAD_X = 14,
+    BASE_PAD_Y = 9,
+    BASE_ROW_GAP = 3,
+    BASE_COL_GAP = 16,
+    BASE_ACCENT_W = 3,
+    BASE_DIVIDER_W = 1,
+    MAX_TEXT_COL_WIDTH = 420,
+    MAX_VALUE_WIDTH = 180,
+    ICON_TO_BOX_RATIO = 0.80,
+    SCREEN_EDGE_MARGIN = 12,
 
-local ENTER_DURATION = 0.20
-local ENTER_BOX_DURATION = 0.16
-local ENTER_REVEAL_DELAY = 0.02
-local ENTER_REVEAL_DURATION = 0.18
-local ENTER_TEXT_DELAY = 0.04
-local ENTER_TEXT_DURATION = 0.14
-local ENTER_ALPHA_DURATION = 0.08
+    ENTER_DURATION = 0.14,
+    ENTER_OPEN_DURATION = 0.13,
+    ENTER_REVEAL_DELAY = 0.01,
+    ENTER_REVEAL_DURATION = 0.13,
+    ENTER_TEXT_DELAY = 0.03,
+    ENTER_TEXT_DURATION = 0.10,
+    ENTER_ALPHA_DURATION = 0.04,
+    ENTER_MIN_OPEN_Y = 0.02,
 
-local SWITCH_DURATION = 0.14
-local SWITCH_TEXT_DURATION = 0.09
-local FLASH_DURATION = 0.12
-local OVERLAY_FLASH_DURATION = 0.14
-local GLOW_DURATION = 0.28
-local BOSS_SPIN_DURATION = 0.45
-local VALUE_FLASH_DURATION = 0.10
-local EXIT_DURATION = 0.22
+    SWITCH_DURATION = 0.14,
+    SWITCH_TEXT_DURATION = 0.09,
+    FLASH_DURATION = 0.10,
+    GLOW_DURATION = 0.24,
+    SHEEN_ENTER_DELAY = 0.09,
+    SHEEN_ENTER_BASE_DURATION = 0.24,
+    SHEEN_SWITCH_DELAY = 0.02,
+    SHEEN_SWITCH_BASE_DURATION = 0.20,
+    SHEEN_S_START = 0.06,
+    SHEEN_S_END = 0.96,
+    SHEEN_COLS = 4,
+    SHEEN_ROWS = 4,
+    SHEEN_FRAMES = 16,
+    SHEEN_UV_INSET = 0.5 / 512,
+    BOSS_SPIN_DELAY = 0.09,
+    BOSS_SPIN_DURATION = 0.39,
+    VALUE_FLASH_DURATION = 0.10,
+    EXIT_DURATION = 0.20,
+    EXIT_TEXT_FADE_START = 0.45,
+    EXIT_TEXT_FADE_END = 0.88,
+    EXIT_ALPHA_FADE_START = 0.76,
 
-local MAX_QUEUE_SIZE = 4
-local MIN_SWITCH_INTERVAL = 0.18
-local URGENT_PREEMPT_INTERVAL = 0.08
-local BOSS_HOLD_PROTECT_INTERVAL = 0.65
-local SAME_BURST_MERGE_WINDOW = 0.08
-local BOSS_DURATION_MULTIPLIER = 1.35
+    MAX_QUEUE_SIZE = 4,
+    MIN_SWITCH_INTERVAL = 0.18,
+    URGENT_PREEMPT_INTERVAL = 0.08,
+    BOSS_HOLD_PROTECT_INTERVAL = 0.65,
+    SAME_BURST_MERGE_WINDOW = 0.08,
+    BOSS_DURATION_MULTIPLIER = 1.35,
+}
 
 local BF1_RED_COLOR = {255, 56, 56}
 local BOSS_DEFAULT_ACCENT_COLOR = {235, 58, 52}
@@ -56,6 +72,10 @@ local _textures = {
     default = nil,
     headshot = nil,
     boss = nil,
+    default_sheen = nil,
+    headshot_sheen = nil,
+    boss_sheen = nil,
+    card_sheen = nil,
 }
 local textures_load_started = false
 
@@ -103,6 +123,9 @@ HKS.HitKillBF1Manager = {
     _exit_start_time = 0,
     _last_push_time = 0,
     _current_text_box_w = 0,
+    _last_open_y = 0,
+    _enter_from_open_y = CFG.ENTER_MIN_OPEN_Y,
+    _entry_is_switch = false,
     _size_cache = {},
     _size_cache_count = 0,
 }
@@ -119,6 +142,9 @@ manager.clear = function()
     manager._exit_start_time = 0
     manager._last_push_time = 0
     manager._current_text_box_w = 0
+    manager._last_open_y = 0
+    manager._enter_from_open_y = CFG.ENTER_MIN_OPEN_Y
+    manager._entry_is_switch = false
 end
 
 local function upgrade_entry_metadata(target, incoming)
@@ -139,14 +165,18 @@ local function upgrade_entry_metadata(target, incoming)
     end
 end
 
-local function begin_entry(ctx, now, state_name)
+local function begin_entry(ctx, now, state_name, resume_open_y)
     manager._current = ctx
     manager._state = state_name
     manager._start_time = now
     manager._last_switch_time = now
     manager._exit_start_time = 0
+    manager._entry_is_switch = state_name == "switch_punch"
     if state_name == "entering" then
         manager._current_text_box_w = 0
+        manager._enter_from_open_y = clamp(tonumber(resume_open_y) or CFG.ENTER_MIN_OPEN_Y, CFG.ENTER_MIN_OPEN_Y, 1)
+    else
+        manager._enter_from_open_y = 1
     end
 end
 
@@ -188,10 +218,11 @@ manager.push_kill = function(raw_ctx, optional_now)
     manager._last_push_time = now
 
     if manager._state == "idle" or manager._state == "exiting" or not manager._current then
+        local resume_open_y = manager._state == "exiting" and manager._last_open_y or CFG.ENTER_MIN_OPEN_Y
         for i = #manager._queue, 1, -1 do
             manager._queue[i] = nil
         end
-        begin_entry(ctx, now, "entering")
+        begin_entry(ctx, now, "entering", resume_open_y)
         return
     end
 
@@ -200,11 +231,12 @@ manager.push_kill = function(raw_ctx, optional_now)
 
     -- Same-burst low-priority merge (horde cleave protection)
     if ctx.priority <= 2 then
-        if #queue == 0 and current.priority <= 2 and (now - manager._start_time) <= SAME_BURST_MERGE_WINDOW then
+        if #queue == 0 and current.priority <= 2 and (now - manager._start_time) <= CFG.SAME_BURST_MERGE_WINDOW then
             local upgraded = ctx.priority > current.priority
             upgrade_entry_metadata(current, ctx)
             if upgraded then
                 manager._state = "switch_punch"
+                manager._entry_is_switch = true
                 manager._start_time = now
                 manager._last_switch_time = now
             end
@@ -212,13 +244,13 @@ manager.push_kill = function(raw_ctx, optional_now)
         end
 
         local tail = queue[#queue]
-        if tail and tail.priority <= 2 and (now - tail.created_at) <= SAME_BURST_MERGE_WINDOW then
+        if tail and tail.priority <= 2 and (now - tail.created_at) <= CFG.SAME_BURST_MERGE_WINDOW then
             upgrade_entry_metadata(tail, ctx)
             return
         end
     end
 
-    if #queue < MAX_QUEUE_SIZE then
+    if #queue < CFG.MAX_QUEUE_SIZE then
         queue[#queue + 1] = ctx
         return
     end
@@ -247,14 +279,42 @@ local function preload_textures_legacy()
         default = host .. "image?path=cartoon_preview/kill_icon/BF1/kill_default.png",
         headshot = host .. "image?path=cartoon_preview/kill_icon/BF1/kill_headshot.png",
         boss = host .. "image?path=cartoon_preview/kill_icon/BF1/kill_boss.png",
+        default_sheen = host .. "image?path=cartoon_preview/kill_icon/BF1/kill_default_sheen_atlas.png",
+        headshot_sheen = host .. "image?path=cartoon_preview/kill_icon/BF1/kill_headshot_sheen_atlas.png",
+        boss_sheen = host .. "image?path=cartoon_preview/kill_icon/BF1/kill_boss_sheen_atlas.png",
+        card_sheen = host .. "image?path=cartoon_preview/kill_icon/BF1/bf1_card_sheen.png",
     }
+    local pending = 0
+    for _ in pairs(urls) do
+        pending = pending + 1
+    end
     for key, url in pairs(urls) do
         local texture_key = key
-        Managers.url_loader:load_texture(url):next(function(data)
-            if data and data.texture then
-                _textures[texture_key] = data.texture
+        local promise = Managers.url_loader:load_texture(url)
+        if promise and promise.next then
+            promise:next(function(data)
+                if data and data.texture then
+                    _textures[texture_key] = data.texture
+                end
+                pending = pending - 1
+                if pending <= 0 and not textures_ready() then
+                    textures_load_started = false
+                end
+            end)
+            if promise.catch then
+                promise:catch(function()
+                    pending = pending - 1
+                    if pending <= 0 and not textures_ready() then
+                        textures_load_started = false
+                    end
+                end)
             end
-        end)
+        else
+            pending = pending - 1
+        end
+    end
+    if pending <= 0 and not textures_ready() then
+        textures_load_started = false
     end
 end
 
@@ -265,17 +325,14 @@ local function preload_textures()
     textures_load_started = true
     if HKS.HitKillSoundsAssetsBackend and HKS.HitKillSoundsAssetsBackend.load_bf1_icons then
         HKS.HitKillSoundsAssetsBackend.load_bf1_icons(_textures, function()
-            textures_load_started = false
             preload_textures_legacy()
+        end, function(is_ok)
+            if not is_ok and not textures_ready() then
+                textures_load_started = false
+            end
         end)
-        if not textures_ready() then
-            textures_load_started = false
-        end
     else
         preload_textures_legacy()
-        if not textures_ready() then
-            textures_load_started = false
-        end
     end
 end
 
@@ -284,7 +341,8 @@ local function rect_visible(_content, style)
 end
 
 local function texture_visible(_content, style)
-    return style.material_values.texture_map ~= nil and style.color[1] > 0 and style.size[1] > 0
+    return style.material_values.texture_map ~= nil and style.color[1] > 0 and
+        style.size[1] > 0 and style.size[2] > 0
 end
 
 local function make_text_visible(value_id)
@@ -321,7 +379,13 @@ local function create_texture_style(z, rotated)
     return style
 end
 
-local function create_text_style(font_size, z)
+local function create_texture_uv_style(z)
+    local style = create_texture_style(z, false)
+    style.uvs = {{0, 0}, {1, 1}}
+    return style
+end
+
+local function create_text_style(font_size, z, horiz_align)
     local base_style = UIFontSettings.hud_body
     return {
         font_type = "proxima_nova_bold",
@@ -330,7 +394,7 @@ local function create_text_style(font_size, z)
         drop_shadow = true,
         horizontal_alignment = "left",
         vertical_alignment = "top",
-        text_horizontal_alignment = "left",
+        text_horizontal_alignment = horiz_align or "left",
         text_vertical_alignment = "center",
         text_color = {0, 255, 255, 255},
         default_text_color = {0, 255, 255, 255},
@@ -376,12 +440,6 @@ local bf1_passes = {
         visibility_function = rect_visible,
     },
     {
-        style_id = "flash_overlay",
-        pass_type = "rect",
-        style = create_rect_style(3),
-        visibility_function = rect_visible,
-    },
-    {
         style_id = "icon_glow",
         value_id = "icon_glow",
         pass_type = "texture",
@@ -396,11 +454,18 @@ local bf1_passes = {
         visibility_function = texture_visible,
     },
     {
+        style_id = "icon_sheen",
+        value_id = "icon_sheen",
+        pass_type = "rotated_texture",
+        style = create_texture_style(6, true),
+        visibility_function = texture_visible,
+    },
+    {
         style_id = "victim_text",
         value_id = "victim_text",
         value = "",
         pass_type = "text",
-        style = create_text_style(BASE_VICTIM_FONT_SIZE, 6),
+        style = create_text_style(CFG.BASE_VICTIM_FONT_SIZE, 7, "right"),
         visibility_function = make_text_visible("victim_text"),
     },
     {
@@ -408,7 +473,7 @@ local bf1_passes = {
         value_id = "weapon_text",
         value = "",
         pass_type = "text",
-        style = create_text_style(BASE_WEAPON_FONT_SIZE, 6),
+        style = create_text_style(CFG.BASE_WEAPON_FONT_SIZE, 7, "right"),
         visibility_function = make_text_visible("weapon_text"),
     },
     {
@@ -416,7 +481,7 @@ local bf1_passes = {
         value_id = "value_text",
         value = "",
         pass_type = "text",
-        style = create_text_style(BASE_VALUE_FONT_SIZE, 6),
+        style = create_text_style(CFG.BASE_VALUE_FONT_SIZE, 7, "center"),
         visibility_function = make_text_visible("value_text"),
     },
     {
@@ -424,8 +489,15 @@ local bf1_passes = {
         value_id = "combo_badge_text",
         value = "",
         pass_type = "text",
-        style = create_text_style(BASE_COMBO_FONT_SIZE, 7),
+        style = create_text_style(CFG.BASE_COMBO_FONT_SIZE, 8, "right"),
         visibility_function = make_text_visible("combo_badge_text"),
+    },
+    {
+        style_id = "card_sheen",
+        value_id = "card_sheen",
+        pass_type = "texture_uv",
+        style = create_texture_uv_style(9),
+        visibility_function = texture_visible,
     },
 }
 
@@ -485,10 +557,10 @@ end
 
 local function resolve_icon_color(kill_type, elapsed, colors)
     local base = colors[kill_type] or colors.default
-    if elapsed >= FLASH_DURATION or kill_type == "default" then
+    if elapsed >= CFG.FLASH_DURATION or kill_type == "default" then
         return base
     end
-    local flash_t = (1 - clamp01(elapsed / FLASH_DURATION)) ^ 2
+    local flash_t = (1 - clamp01(elapsed / CFG.FLASH_DURATION)) ^ 2
     if kill_type == "headshot" then
         return mix_rgb(base, {255, 255, 255}, 0.70 * flash_t)
     elseif kill_type == "boss" then
@@ -504,6 +576,129 @@ local function resolve_texture(kill_type)
         return _textures.headshot
     end
     return _textures.default or _textures.headshot or _textures.boss
+end
+
+local function resolve_sheen_texture(kill_type)
+    if kill_type == "boss" and HKS:get("bf1_boss_icon_enabled") ~= false and _textures.boss then
+        return _textures.boss_sheen
+    elseif kill_type == "headshot" and _textures.headshot then
+        return _textures.headshot_sheen
+    end
+    if _textures.default then
+        return _textures.default_sheen
+    elseif _textures.headshot then
+        return _textures.headshot_sheen
+    elseif _textures.boss then
+        return _textures.boss_sheen
+    end
+    return nil
+end
+
+local function compute_sweep_state(
+    elapsed, is_switch, is_exiting, left_x, total_w, draw_box_h, base_box_h,
+    icon_center_x, icon_draw_w, icon_sheen_tex, card_sheen_tex, icon_only, bg_opacity
+)
+    if is_exiting or draw_box_h <= 0 or total_w <= 0 then
+        return nil
+    end
+    if not icon_sheen_tex and not card_sheen_tex then
+        return nil
+    end
+
+    local delay = is_switch and CFG.SHEEN_SWITCH_DELAY or CFG.SHEEN_ENTER_DELAY
+    local card_ratio = total_w / math.max(base_box_h, 1)
+    local dur
+    if is_switch then
+        dur = clamp(CFG.SHEEN_SWITCH_BASE_DURATION + 0.036 * math.max(card_ratio - 1, 0), 0.20, 0.38)
+    else
+        dur = clamp(CFG.SHEEN_ENTER_BASE_DURATION + 0.045 * math.max(card_ratio - 1, 0), 0.24, 0.48)
+    end
+
+    if elapsed < delay or elapsed >= delay + dur then
+        return nil
+    end
+
+    local p = clamp01((elapsed - delay) / dur)
+    local eased_p = p < 0.5 and (2 * p * p) or (1 - ((-2 * p + 2) ^ 2) * 0.5)
+    local span_w = draw_box_h * 2.0
+    local start_x = left_x - span_w * 0.42
+    local end_x = left_x + total_w + span_w * 0.42
+    local beam_cx = start_x + (end_x - start_x) * eased_p
+
+    -- Full-card analytically clipped 45-degree sweep (exact 2:1 span keeps true 45 deg on any banner width)
+    local card_x, card_w, card_uvs = 0, 0, nil
+    local card_alpha_mult = 0
+    if card_sheen_tex and (not icon_only or bg_opacity > 0) then
+        local beam_left = beam_cx - span_w * 0.5
+        local beam_right = beam_cx + span_w * 0.5
+        local vis_left = math.max(beam_left, left_x)
+        local vis_right = math.min(beam_right, left_x + total_w)
+        if vis_right > vis_left then
+            card_x = vis_left
+            card_w = vis_right - vis_left
+            local u0 = clamp01((vis_left - beam_left) / span_w)
+            local u1 = clamp01((vis_right - beam_left) / span_w)
+            card_uvs = {{u0, 0}, {u1, 1}}
+            if bg_opacity > 0 then
+                card_alpha_mult = 0.30 + 0.22 * clamp01(bg_opacity / 0.50)
+            else
+                card_alpha_mult = 0.24
+            end
+        end
+    end
+
+    -- Collinear silhouette-masked skull/gear highlight locked to the exact same beam_cx
+    local icon_uvs = nil
+    local contrast_dim = 0
+    if icon_sheen_tex and icon_draw_w > 0 then
+        local s_skull = 0.5 + (beam_cx - icon_center_x) / (2 * icon_draw_w)
+        local dim_lo = CFG.SHEEN_S_START - 0.14
+        local dim_hi = CFG.SHEEN_S_END + 0.16
+        if s_skull >= dim_lo and s_skull <= dim_hi then
+            if s_skull < CFG.SHEEN_S_START then
+                contrast_dim = clamp01((s_skull - dim_lo) / 0.14)
+            elseif s_skull <= CFG.SHEEN_S_END then
+                contrast_dim = 1
+            else
+                contrast_dim = 1 - clamp01((s_skull - CFG.SHEEN_S_END) / 0.16)
+            end
+        end
+
+        if s_skull >= CFG.SHEEN_S_START and s_skull <= CFG.SHEEN_S_END then
+            local u_skull = clamp01((s_skull - CFG.SHEEN_S_START) / (CFG.SHEEN_S_END - CFG.SHEEN_S_START))
+            local frame_idx = clamp(math.floor(u_skull * CFG.SHEEN_FRAMES), 0, CFG.SHEEN_FRAMES - 1)
+            local col = frame_idx % CFG.SHEEN_COLS
+            local row = math.floor(frame_idx / CFG.SHEEN_COLS)
+            local u0 = col / CFG.SHEEN_COLS + CFG.SHEEN_UV_INSET
+            local u1 = (col + 1) / CFG.SHEEN_COLS - CFG.SHEEN_UV_INSET
+            local v0 = row / CFG.SHEEN_ROWS + CFG.SHEEN_UV_INSET
+            local v1 = (row + 1) / CFG.SHEEN_ROWS - CFG.SHEEN_UV_INSET
+            icon_uvs = {{u0, v0}, {u1, v1}}
+        end
+    end
+
+    return {
+        card_x = card_x,
+        card_w = card_w,
+        card_uvs = card_uvs,
+        card_alpha_mult = card_alpha_mult,
+        icon_uvs = icon_uvs,
+        contrast_dim = contrast_dim,
+    }
+end
+
+local function apply_sheen_contrast(rgb, contrast_dim)
+    if contrast_dim <= 0 then
+        return rgb
+    end
+    local min_chan = math.min(rgb[1], rgb[2], rgb[3]) / 255
+    local dip_strength = 0.08 + 0.11 * min_chan
+    local factor = 1 - dip_strength * clamp01(contrast_dim)
+    return {
+        clamp(math.floor(rgb[1] * factor + 0.5), 0, 255),
+        clamp(math.floor(rgb[2] * factor + 0.5), 0, 255),
+        clamp(math.floor(rgb[3] * factor + 0.5), 0, 255),
+    }
 end
 
 local function resolve_value_text(entry)
@@ -532,27 +727,27 @@ end
 
 local function compute_icon_enter_scale(kill_type, elapsed, is_switch)
     if is_switch then
-        local t = clamp01(elapsed / SWITCH_DURATION)
+        local t = clamp01(elapsed / CFG.SWITCH_DURATION)
         local eased = 1 - (1 - t) ^ 3
-        return 1.28 + (1.00 - 1.28) * eased
+        return 1.22 + (1.00 - 1.22) * eased
     end
 
     if kill_type == "headshot" or kill_type == "boss" then
-        local peak = kill_type == "headshot" and 1.65 or 1.60
-        local t = clamp01(elapsed / 0.18)
-        if t < 0.60 then
-            local slam_t = t / 0.60
+        local peak = kill_type == "headshot" and 1.32 or 1.28
+        local t = clamp01(elapsed / 0.16)
+        if t < 0.62 then
+            local slam_t = t / 0.62
             local slam_eased = 1 - (1 - slam_t) ^ 3
-            return peak + (0.94 - peak) * slam_eased
+            return peak + (0.96 - peak) * slam_eased
         end
-        local rebound_t = (t - 0.60) / 0.40
+        local rebound_t = (t - 0.62) / 0.38
         local rebound_eased = 1 - (1 - rebound_t) ^ 2
-        return 0.94 + (1.00 - 0.94) * rebound_eased
+        return 0.96 + (1.00 - 0.96) * rebound_eased
     end
 
-    local t = clamp01(elapsed / ENTER_BOX_DURATION)
+    local t = clamp01(elapsed / CFG.ENTER_OPEN_DURATION)
     local eased = 1 - (1 - t) ^ 3
-    return 1.38 + (1.00 - 1.38) * eased
+    return 1.18 + (1.00 - 1.18) * eased
 end
 
 local function set_rect(style, x, y, w, h, alpha, rgb, z)
@@ -574,9 +769,9 @@ local function set_rect(style, x, y, w, h, alpha, rgb, z)
     style.offset[3] = z
 end
 
-local function set_texture_pass(style, tex, x, y, size, alpha, rgb, z, angle)
+local function set_texture_pass(style, tex, x, y, w, h, alpha, rgb, z, angle, uvs)
     local a = clamp(math.floor((tonumber(alpha) or 0) + 0.5), 0, 255)
-    if not tex or a <= 0 or size <= 0 then
+    if not tex or a <= 0 or w <= 0 or h <= 0 then
         style.material_values.texture_map = nil
         style.color[1] = 0
         style.size[1] = 0
@@ -588,15 +783,28 @@ local function set_texture_pass(style, tex, x, y, size, alpha, rgb, z, angle)
     style.color[2] = rgb[1]
     style.color[3] = rgb[2]
     style.color[4] = rgb[3]
-    style.size[1] = size
-    style.size[2] = size
+    style.size[1] = w
+    style.size[2] = h
     style.offset[1] = x
     style.offset[2] = y
     style.offset[3] = z
+    if style.uvs then
+        if uvs then
+            style.uvs[1][1] = uvs[1][1]
+            style.uvs[1][2] = uvs[1][2]
+            style.uvs[2][1] = uvs[2][1]
+            style.uvs[2][2] = uvs[2][2]
+        else
+            style.uvs[1][1] = 0
+            style.uvs[1][2] = 0
+            style.uvs[2][1] = 1
+            style.uvs[2][2] = 1
+        end
+    end
     if style.pivot then
         style.angle = angle or 0
-        style.pivot[1] = size * 0.5
-        style.pivot[2] = size * 0.5
+        style.pivot[1] = w * 0.5
+        style.pivot[2] = h * 0.5
     end
 end
 
@@ -630,14 +838,14 @@ local function clear_banner_widget(widget)
     end
     local styles = widget.style
     local content = widget.content
-    for _, key in ipairs({"icon_box_bg", "text_box_bg", "accent_bar", "box_divider", "flash_overlay"}) do
+    for _, key in ipairs({"icon_box_bg", "text_box_bg", "accent_bar", "box_divider"}) do
         if styles[key] then
             styles[key].color[1] = 0
             styles[key].size[1] = 0
             styles[key].size[2] = 0
         end
     end
-    for _, key in ipairs({"icon_glow", "icon_main"}) do
+    for _, key in ipairs({"icon_glow", "icon_main", "icon_sheen", "card_sheen"}) do
         if styles[key] then
             styles[key].material_values.texture_map = nil
             styles[key].color[1] = 0
@@ -704,11 +912,11 @@ local function try_advance_queue(now)
     end
 
     local current = manager._current
-    local required_delay = MIN_SWITCH_INTERVAL
+    local required_delay = CFG.MIN_SWITCH_INTERVAL
     if current.kill_type == "boss" and next_ctx.priority < 5 then
-        required_delay = BOSS_HOLD_PROTECT_INTERVAL
+        required_delay = CFG.BOSS_HOLD_PROTECT_INTERVAL
     elseif next_ctx.priority >= current.priority + 2 then
-        required_delay = URGENT_PREEMPT_INTERVAL
+        required_delay = CFG.URGENT_PREEMPT_INTERVAL
     end
 
     if (now - manager._last_switch_time) >= required_delay then
@@ -755,12 +963,12 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
     end
 
     local base_duration = (tonumber(HKS:get("kill_icon_duration_bf1")) or 25) / 10
-    local hold_duration = entry.kill_type == "boss" and (base_duration * BOSS_DURATION_MULTIPLIER) or base_duration
+    local hold_duration = entry.kill_type == "boss" and (base_duration * CFG.BOSS_DURATION_MULTIPLIER) or base_duration
     local elapsed = math.max(0, now - manager._start_time)
 
-    if manager._state == "entering" and elapsed >= ENTER_DURATION then
+    if manager._state == "entering" and elapsed >= CFG.ENTER_DURATION then
         manager._state = "holding"
-    elseif manager._state == "switch_punch" and elapsed >= SWITCH_DURATION then
+    elseif manager._state == "switch_punch" and elapsed >= CFG.SWITCH_DURATION then
         manager._state = "holding"
     end
 
@@ -771,7 +979,7 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
 
     if manager._state == "exiting" then
         local exit_elapsed = math.max(0, now - manager._exit_start_time)
-        if exit_elapsed >= EXIT_DURATION then
+        if exit_elapsed >= CFG.EXIT_DURATION then
             manager.clear()
             clear_banner_widget(widget)
             self._update_scenegraph = true
@@ -787,20 +995,20 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
     local bg_opacity = clamp((tonumber(HKS:get("bf1_bg_opacity")) or 48) / 100, 0, 1)
     local icon_only = HKS:get("bf1_display_mode") == "icon_only"
 
-    local victim_font = math.max(10, math.floor(BASE_VICTIM_FONT_SIZE * size_scale + 0.5))
-    local weapon_font = math.max(10, math.floor(BASE_WEAPON_FONT_SIZE * size_scale + 0.5))
-    local value_font = math.max(14, math.floor(BASE_VALUE_FONT_SIZE * size_scale + 0.5))
-    local combo_font = math.max(10, math.floor(BASE_COMBO_FONT_SIZE * size_scale + 0.5))
+    local victim_font = math.max(10, math.floor(CFG.BASE_VICTIM_FONT_SIZE * size_scale + 0.5))
+    local weapon_font = math.max(10, math.floor(CFG.BASE_WEAPON_FONT_SIZE * size_scale + 0.5))
+    local value_font = math.max(14, math.floor(CFG.BASE_VALUE_FONT_SIZE * size_scale + 0.5))
+    local combo_font = math.max(10, math.floor(CFG.BASE_COMBO_FONT_SIZE * size_scale + 0.5))
 
-    local pad_x = BASE_PAD_X * size_scale
-    local pad_y = BASE_PAD_Y * size_scale
-    local row_gap = BASE_ROW_GAP * size_scale
-    local col_gap = BASE_COL_GAP * size_scale
+    local pad_x = CFG.BASE_PAD_X * size_scale
+    local pad_y = CFG.BASE_PAD_Y * size_scale
+    local row_gap = CFG.BASE_ROW_GAP * size_scale
+    local col_gap = CFG.BASE_COL_GAP * size_scale
 
     local styles = widget.style
     local content = widget.content
-    local max_text_w = MAX_TEXT_COL_WIDTH * size_scale
-    local max_val_w = MAX_VALUE_WIDTH * size_scale
+    local max_text_w = CFG.MAX_TEXT_COL_WIDTH * size_scale
+    local max_val_w = CFG.MAX_VALUE_WIDTH * size_scale
 
     local victim_w, victim_h = self:_measure_text(
         ui_renderer, entry.victim_name, styles.victim_text, victim_font, max_text_w, victim_font * 2
@@ -828,51 +1036,79 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
         end
     end
 
-    -- Phase animation envelopes
+    -- Phase animation envelopes (vertical center-outward scale open & center-inward collapse)
     local global_alpha = 1
-    local box_scale = 1
-    local exit_y_offset = 0
+    local open_y
     local text_alpha = 1
+    local text_scale = 1
     local text_slide_x = 0
 
     if manager._state == "entering" then
-        local t_box = clamp01(elapsed / ENTER_BOX_DURATION)
-        local eased_box = 1 - (1 - t_box) ^ 3
-        box_scale = 0.72 + 0.28 * eased_box
-        global_alpha = clamp01(elapsed / ENTER_ALPHA_DURATION)
+        local t_open = clamp01(elapsed / CFG.ENTER_OPEN_DURATION)
+        local eased_open = 1 - (1 - t_open) ^ 4
+        local start_open = clamp(tonumber(manager._enter_from_open_y) or CFG.ENTER_MIN_OPEN_Y, CFG.ENTER_MIN_OPEN_Y, 1)
+        open_y = start_open + (1 - start_open) * eased_open
+        global_alpha = 0.20 + 0.80 * clamp01(elapsed / CFG.ENTER_ALPHA_DURATION)
 
-        local t_rev = clamp01((elapsed - ENTER_REVEAL_DELAY) / ENTER_REVEAL_DURATION)
-        local eased_rev = 1 - (1 - t_rev) ^ 4
-        manager._current_text_box_w = target_text_box_w * (0.18 + 0.82 * eased_rev)
+        local t_rev = clamp01((elapsed - CFG.ENTER_REVEAL_DELAY) / CFG.ENTER_REVEAL_DURATION)
+        local eased_rev = 1 - (1 - t_rev) ^ 3
+        manager._current_text_box_w = target_text_box_w * (0.92 + 0.08 * eased_rev)
 
-        local t_txt = clamp01((elapsed - ENTER_TEXT_DELAY) / ENTER_TEXT_DURATION)
-        local eased_txt = 1 - (1 - t_txt) ^ 3
-        text_alpha = eased_txt
-        text_slide_x = -12 * size_scale * (1 - eased_txt)
+        if open_y >= 0.38 then
+            local t_txt = clamp01((elapsed - CFG.ENTER_TEXT_DELAY) / CFG.ENTER_TEXT_DURATION)
+            local eased_txt = 1 - (1 - t_txt) ^ 3
+            text_alpha = eased_txt
+            text_scale = clamp(open_y ^ 0.85, 0.45, 1)
+            text_slide_x = -6 * size_scale * (1 - eased_txt)
+        else
+            text_alpha = 0
+            text_scale = 0.45
+            text_slide_x = -6 * size_scale
+        end
     elseif manager._state == "switch_punch" then
+        open_y = 1
         local move_alpha = step_dt > 0 and (1 - math.exp(-22 * step_dt)) or 1
         manager._current_text_box_w = manager._current_text_box_w +
             (target_text_box_w - manager._current_text_box_w) * move_alpha
 
-        local t_txt = clamp01(elapsed / SWITCH_TEXT_DURATION)
+        local t_txt = clamp01(elapsed / CFG.SWITCH_TEXT_DURATION)
         local eased_txt = 1 - (1 - t_txt) ^ 3
         text_alpha = 0.30 + 0.70 * eased_txt
-        text_slide_x = -8 * size_scale * (1 - eased_txt)
+        text_slide_x = -6 * size_scale * (1 - eased_txt)
     elseif manager._state == "exiting" then
-        local t_exit = clamp01((now - manager._exit_start_time) / EXIT_DURATION)
-        global_alpha = 1 - t_exit * t_exit
-        box_scale = 1.00 - 0.05 * t_exit
-        exit_y_offset = 4 * size_scale * t_exit
+        local t_exit = clamp01((now - manager._exit_start_time) / CFG.EXIT_DURATION)
+        open_y = 1 - (t_exit ^ 2.4)
+        text_scale = clamp(open_y ^ 0.85, 0.35, 1)
+
+        if t_exit <= CFG.EXIT_TEXT_FADE_START then
+            text_alpha = 1
+        elseif t_exit < CFG.EXIT_TEXT_FADE_END then
+            local fade_span = CFG.EXIT_TEXT_FADE_END - CFG.EXIT_TEXT_FADE_START
+            local t_txt_fade = clamp01((t_exit - CFG.EXIT_TEXT_FADE_START) / fade_span)
+            text_alpha = 1 - t_txt_fade * t_txt_fade
+        else
+            text_alpha = 0
+        end
+
+        if t_exit >= CFG.EXIT_ALPHA_FADE_START then
+            local t_alpha = clamp01((t_exit - CFG.EXIT_ALPHA_FADE_START) / (1 - CFG.EXIT_ALPHA_FADE_START))
+            global_alpha = 1 - t_alpha * t_alpha
+        else
+            global_alpha = 1
+        end
         manager._current_text_box_w = target_text_box_w
     else
+        open_y = 1
         local move_alpha = step_dt > 0 and (1 - math.exp(-22 * step_dt)) or 1
         manager._current_text_box_w = manager._current_text_box_w +
             (target_text_box_w - manager._current_text_box_w) * move_alpha
     end
 
-    local draw_box_h = base_box_h * box_scale
-    local icon_box_w = draw_box_h
-    local text_box_w = icon_only and 0 or (manager._current_text_box_w * box_scale)
+    manager._last_open_y = open_y
+
+    local draw_box_h = base_box_h * open_y
+    local icon_box_w = base_box_h
+    local text_box_w = icon_only and 0 or manager._current_text_box_w
     local total_w = icon_box_w + text_box_w
 
     local screen_w = UIWorkspaceSettings.screen.size[1]
@@ -883,28 +1119,47 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
     local center_x = screen_w * horiz / 100
     local left_x = clamp(
         center_x - total_w * 0.5,
-        SCREEN_EDGE_MARGIN,
-        math.max(SCREEN_EDGE_MARGIN, screen_w - total_w - SCREEN_EDGE_MARGIN)
+        CFG.SCREEN_EDGE_MARGIN,
+        math.max(CFG.SCREEN_EDGE_MARGIN, screen_w - total_w - CFG.SCREEN_EDGE_MARGIN)
     )
     local base_top_y = (vert / 100) * math.max(screen_h - base_box_h, 1)
-    local top_y = clamp(
-        base_top_y + (base_box_h - draw_box_h) * 0.5 + exit_y_offset,
-        SCREEN_EDGE_MARGIN,
-        math.max(SCREEN_EDGE_MARGIN, screen_h - draw_box_h - SCREEN_EDGE_MARGIN)
+    local center_y = clamp(
+        base_top_y + base_box_h * 0.5,
+        CFG.SCREEN_EDGE_MARGIN + base_box_h * 0.5,
+        math.max(CFG.SCREEN_EDGE_MARGIN + base_box_h * 0.5, screen_h - CFG.SCREEN_EDGE_MARGIN - base_box_h * 0.5)
     )
+    local top_y = center_y - draw_box_h * 0.5
 
     local eff_alpha = global_alpha * transparency
     local colors = resolve_colors()
     local accent_rgb = resolve_accent_color(entry.kill_type, colors)
     local icon_rgb = resolve_icon_color(entry.kill_type, elapsed, colors)
     local icon_tex = resolve_texture(entry.kill_type)
+    local sheen_tex = resolve_sheen_texture(entry.kill_type)
+    local is_exiting = manager._state == "exiting"
+    local is_switch = manager._state == "switch_punch"
+    local icon_scale = 1
+    if not is_exiting then
+        icon_scale = compute_icon_enter_scale(entry.kill_type, elapsed, is_switch)
+    end
+    local icon_center_x = left_x + icon_box_w * 0.5
+    local icon_center_y = center_y
+    local base_icon_size = base_box_h * CFG.ICON_TO_BOX_RATIO
+    local icon_draw_w = base_icon_size * icon_scale
+    local icon_draw_h = icon_draw_w * open_y
 
-    -- Box backgrounds, accent bar, divider
+    local sweep = compute_sweep_state(
+        elapsed, manager._entry_is_switch, is_exiting, left_x, total_w, draw_box_h, base_box_h,
+        icon_center_x, icon_draw_w, sheen_tex, _textures.card_sheen, icon_only, bg_opacity
+    )
+    local draw_icon_rgb = apply_sheen_contrast(icon_rgb, sweep and sweep.contrast_dim or 0)
+
+    -- Box backgrounds, accent bar, divider (no center seam or full-box flash)
     local icon_bg_alpha = 255 * bg_opacity * eff_alpha
     local text_bg_alpha = 255 * bg_opacity * 0.62 * eff_alpha
     set_rect(styles.icon_box_bg, left_x, top_y, icon_box_w, draw_box_h, icon_bg_alpha, {12, 14, 16}, 1)
 
-    local accent_w = math.max(2, BASE_ACCENT_W * size_scale * box_scale)
+    local accent_w = math.max(2, CFG.BASE_ACCENT_W * size_scale)
     local accent_alpha = bg_opacity > 0 and (255 * 0.90 * eff_alpha) or 0
     set_rect(styles.accent_bar, left_x, top_y, accent_w, draw_box_h, accent_alpha, accent_rgb, 2)
 
@@ -915,7 +1170,7 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
         )
         local divider_alpha = bg_opacity > 0 and (255 * 0.14 * eff_alpha) or 0
         set_rect(
-            styles.box_divider, left_x + icon_box_w, top_y, BASE_DIVIDER_W, draw_box_h,
+            styles.box_divider, left_x + icon_box_w, top_y, CFG.BASE_DIVIDER_W, draw_box_h,
             divider_alpha, {255, 255, 255}, 2
         )
     else
@@ -923,130 +1178,173 @@ HudHitKillBF1.update = function(self, dt, t, ui_renderer, render_settings, input
         set_rect(styles.box_divider, 0, 0, 0, 0, 0, {0, 0, 0}, 2)
     end
 
-    -- Flash overlay in icon box
-    if elapsed < OVERLAY_FLASH_DURATION and bg_opacity > 0 and manager._state ~= "exiting" then
-        local f_t = clamp01(elapsed / OVERLAY_FLASH_DURATION)
-        local peak = (entry.kill_type == "headshot" or entry.kill_type == "boss") and 0.40 or 0.26
-        local flash_alpha = 255 * peak * ((1 - f_t) ^ 2.5) * eff_alpha
-        set_rect(styles.flash_overlay, left_x, top_y, icon_box_w, draw_box_h, flash_alpha, accent_rgb, 3)
-    else
-        set_rect(styles.flash_overlay, 0, 0, 0, 0, 0, {0, 0, 0}, 3)
-    end
-
-    -- Emblem glow & main rotated emblem
-    local icon_center_x = left_x + icon_box_w * 0.5
-    local icon_center_y = top_y + draw_box_h * 0.5
-    local base_icon_size = base_box_h * ICON_TO_BOX_RATIO * box_scale
-
+    -- Emblem glow, main vertically-scaled emblem & collinear 45-degree silhouette sheen
     if (entry.kill_type == "headshot" or entry.kill_type == "boss") and
-        elapsed < GLOW_DURATION and manager._state ~= "exiting" then
-        local g_t = clamp01(elapsed / GLOW_DURATION)
+        elapsed < CFG.GLOW_DURATION and not is_exiting then
+        local g_t = clamp01(elapsed / CFG.GLOW_DURATION)
         local glow_eased = 1 - (1 - g_t) ^ 3
-        local glow_size = base_icon_size * (0.95 + 0.60 * glow_eased)
-        local glow_alpha = 255 * 0.50 * ((1 - g_t) ^ 2) * eff_alpha
+        local glow_w = base_icon_size * (0.95 + 0.55 * glow_eased)
+        local glow_h = glow_w * open_y
+        local glow_alpha = 255 * 0.45 * ((1 - g_t) ^ 2) * eff_alpha
         set_texture_pass(
             styles.icon_glow,
             icon_tex,
-            icon_center_x - glow_size * 0.5,
-            icon_center_y - glow_size * 0.5,
-            glow_size,
+            icon_center_x - glow_w * 0.5,
+            icon_center_y - glow_h * 0.5,
+            glow_w,
+            glow_h,
             glow_alpha,
             accent_rgb,
             4
         )
     else
-        set_texture_pass(styles.icon_glow, nil, 0, 0, 0, 0, {255, 255, 255}, 4)
+        set_texture_pass(styles.icon_glow, nil, 0, 0, 0, 0, 0, {255, 255, 255}, 4)
     end
 
-    local is_switch = manager._state == "switch_punch"
-    local icon_scale = 1
-    if manager._state ~= "exiting" then
-        icon_scale = compute_icon_enter_scale(entry.kill_type, elapsed, is_switch)
-    end
-    local icon_draw_size = base_icon_size * icon_scale
     local icon_angle = 0
-    if entry.kill_type == "boss" then
-        local spin_t = clamp01(elapsed / BOSS_SPIN_DURATION)
+    if entry.kill_type == "boss" and not is_exiting then
+        local spin_t = clamp01((elapsed - CFG.BOSS_SPIN_DELAY) / CFG.BOSS_SPIN_DURATION)
         local spin_deg = 45 * (1 - (1 - spin_t) ^ 3)
         icon_angle = -math.rad(spin_deg)
     end
+    local icon_x = icon_center_x - icon_draw_w * 0.5
+    local icon_y = icon_center_y - icon_draw_h * 0.5
     set_texture_pass(
         styles.icon_main,
         icon_tex,
-        icon_center_x - icon_draw_size * 0.5,
-        icon_center_y - icon_draw_size * 0.5,
-        icon_draw_size,
+        icon_x,
+        icon_y,
+        icon_draw_w,
+        icon_draw_h,
         255 * eff_alpha,
-        icon_rgb,
+        draw_icon_rgb,
         5,
         icon_angle
     )
 
-    -- Text passes
+    if sweep and sweep.icon_uvs then
+        local sheen_alpha = 255 * ((entry.kill_type == "default") and 0.92 or 1.00) * eff_alpha
+        set_texture_pass(
+            styles.icon_sheen,
+            sheen_tex,
+            icon_x,
+            icon_y,
+            icon_draw_w,
+            icon_draw_h,
+            sheen_alpha,
+            {255, 255, 255},
+            6,
+            icon_angle,
+            sweep.icon_uvs
+        )
+    else
+        set_texture_pass(styles.icon_sheen, nil, 0, 0, 0, 0, 0, {255, 255, 255}, 6)
+    end
+
+    -- Text passes (vertically compressed & pulled toward center_y in sync with open_y)
     local final_text_alpha = 255 * eff_alpha * text_alpha
-    if not icon_only then
+    local victim_draw_font = math.max(8, math.floor(victim_font * text_scale + 0.5))
+    local weapon_draw_font = math.max(8, math.floor(weapon_font * text_scale + 0.5))
+    local value_draw_font = math.max(10, math.floor(value_font * text_scale + 0.5))
+    local combo_draw_font = math.max(8, math.floor(combo_font * text_scale + 0.5))
+
+    if not icon_only and final_text_alpha > 0 then
         local text_box_left = left_x + icon_box_w
-        local text_col_right = text_box_left + pad_x + text_col_w + text_slide_x
-        local block_top_y = top_y + (draw_box_h - text_block_h) * 0.5
+        local text_col_left = text_box_left + pad_x + text_slide_x
+        local text_col_right = text_col_left + text_col_w
+        local scaled_row1_h = row1_h * open_y
+        local scaled_row2_h = row2_h * open_y
+        local scaled_row_gap = row_gap * open_y
+        local scaled_block_h = scaled_row1_h + scaled_row_gap + scaled_row2_h
+        local block_top_y = center_y - scaled_block_h * 0.5
 
         local victim_rgb = resolve_victim_color(entry)
-        local victim_draw_w = math.min(max_text_w, victim_w)
         set_text_pass(
             content, styles.victim_text, "victim_text", entry.victim_name,
-            text_col_right - victim_draw_w, block_top_y,
-            victim_draw_w + 32, row1_h, victim_font, final_text_alpha, victim_rgb, 6
+            text_col_left - 32, block_top_y,
+            text_col_w + 32, math.max(scaled_row1_h, victim_draw_font),
+            victim_draw_font, final_text_alpha, victim_rgb, 7
         )
 
-        local weapon_draw_w = math.min(max_text_w, weapon_w)
         set_text_pass(
             content, styles.weapon_text, "weapon_text", entry.weapon_name,
-            text_col_right - weapon_draw_w, block_top_y + row1_h + row_gap,
-            weapon_draw_w + 32, row2_h, weapon_font, final_text_alpha, {255, 255, 255}, 6
+            text_col_left - 32, block_top_y + scaled_row1_h + scaled_row_gap,
+            text_col_w + 32, math.max(scaled_row2_h, weapon_draw_font),
+            weapon_draw_font, final_text_alpha, {255, 255, 255}, 7
         )
 
         if value_str ~= "" then
             local val_rgb = {255, 255, 255}
-            if entry.kill_type == "headshot" and elapsed < VALUE_FLASH_DURATION then
-                local vt = 1 - clamp01(elapsed / VALUE_FLASH_DURATION)
+            if entry.kill_type == "headshot" and elapsed < CFG.VALUE_FLASH_DURATION then
+                local vt = 1 - clamp01(elapsed / CFG.VALUE_FLASH_DURATION)
                 val_rgb = mix_rgb({255, 255, 255}, colors.headshot, 0.45 * vt)
             end
-            local val_h = math.max(value_h, value_font)
-            local val_x = text_col_right + col_gap
-            local val_y = top_y + (draw_box_h - val_h) * 0.5
+            local val_h = math.max(value_h * open_y, value_draw_font)
+            local val_x = text_col_right + col_gap - 12
+            local val_y = center_y - val_h * 0.5
             set_text_pass(
                 content, styles.value_text, "value_text", value_str,
-                val_x, val_y, value_w + 24, val_h, value_font, final_text_alpha, val_rgb, 6
+                val_x, val_y, value_w + 24, val_h, value_draw_font, final_text_alpha, val_rgb, 7
             )
         else
-            set_text_pass(content, styles.value_text, "value_text", "", 0, 0, 0, 0, value_font, 0, {255, 255, 255}, 6)
+            set_text_pass(
+                content, styles.value_text, "value_text", "", 0, 0, 0, 0, value_draw_font, 0, {255, 255, 255}, 7
+            )
         end
     else
-        set_text_pass(content, styles.victim_text, "victim_text", "", 0, 0, 0, 0, victim_font, 0, {255, 255, 255}, 6)
-        set_text_pass(content, styles.weapon_text, "weapon_text", "", 0, 0, 0, 0, weapon_font, 0, {255, 255, 255}, 6)
-        set_text_pass(content, styles.value_text, "value_text", "", 0, 0, 0, 0, value_font, 0, {255, 255, 255}, 6)
+        set_text_pass(
+            content, styles.victim_text, "victim_text", "", 0, 0, 0, 0, victim_draw_font, 0, {255, 255, 255}, 7
+        )
+        set_text_pass(
+            content, styles.weapon_text, "weapon_text", "", 0, 0, 0, 0, weapon_draw_font, 0, {255, 255, 255}, 7
+        )
+        set_text_pass(
+            content, styles.value_text, "value_text", "", 0, 0, 0, 0, value_draw_font, 0, {255, 255, 255}, 7
+        )
     end
 
-    -- Burst combo badge (x2, x3...)
+    -- Burst combo badge (x2, x3...) compressed and faded with text envelope
     local batch_count = tonumber(entry.batch_count) or 1
-    if batch_count >= 2 then
+    if batch_count >= 2 and final_text_alpha > 0 then
         local badge_text = "x" .. tostring(batch_count)
         local badge_w, badge_h = self:_measure_text(
             ui_renderer, badge_text, styles.combo_badge_text, combo_font, 80 * size_scale, combo_font * 2
         )
-        local badge_x = icon_only and (left_x + icon_box_w - badge_w - 4 * size_scale) or
-            (left_x + total_w - badge_w - 5 * size_scale)
-        local badge_y = icon_only and (top_y + draw_box_h - math.max(badge_h, combo_font) - 2 * size_scale) or
-            (top_y + 2 * size_scale)
+        local badge_draw_h = math.max(badge_h * open_y, combo_draw_font)
+        local badge_box_w = math.max(badge_w + 16, 24)
+        local badge_x = icon_only and (left_x + icon_box_w - badge_box_w - 4 * size_scale) or
+            (left_x + total_w - badge_box_w - 5 * size_scale)
+        local badge_y = icon_only and (top_y + draw_box_h - badge_draw_h - 2 * size_scale * open_y) or
+            (top_y + 2 * size_scale * open_y)
         set_text_pass(
             content, styles.combo_badge_text, "combo_badge_text", badge_text,
-            badge_x, badge_y, badge_w + 16, math.max(badge_h, combo_font),
-            combo_font, 255 * eff_alpha, {255, 235, 190}, 7
+            badge_x, badge_y, badge_box_w, badge_draw_h,
+            combo_draw_font, final_text_alpha, {255, 235, 190}, 8
         )
     else
         set_text_pass(
             content, styles.combo_badge_text, "combo_badge_text", "",
-            0, 0, 0, 0, combo_font, 0, {255, 235, 190}, 7
+            0, 0, 0, 0, combo_draw_font, 0, {255, 235, 190}, 8
         )
+    end
+
+    -- Full-card 45-degree light sweep across emblem, divider & text (z = 9, strictly clipped to card)
+    if sweep and sweep.card_uvs and sweep.card_w > 0 and sweep.card_alpha_mult > 0 then
+        set_texture_pass(
+            styles.card_sheen,
+            _textures.card_sheen,
+            sweep.card_x,
+            top_y,
+            sweep.card_w,
+            draw_box_h,
+            255 * sweep.card_alpha_mult * eff_alpha,
+            {255, 255, 255},
+            9,
+            nil,
+            sweep.card_uvs
+        )
+    else
+        set_texture_pass(styles.card_sheen, nil, 0, 0, 0, 0, 0, {255, 255, 255}, 9)
     end
 
     self._was_active = true
@@ -1060,6 +1358,15 @@ HudHitKillBF1.draw = function(self, dt, t, ui_renderer, render_settings, input_s
         return
     end
     HudHitKillBF1.super.draw(self, dt, t, ui_renderer, render_settings, input_service)
+end
+
+HudHitKillBF1.destroy = function(self, ui_renderer)
+    local widget = self._widgets_by_name and self._widgets_by_name.bf1_banner
+    manager.clear()
+    clear_banner_widget(widget)
+    self._was_active = false
+    self._has_active_content = false
+    HudHitKillBF1.super.destroy(self, ui_renderer)
 end
 
 return HudHitKillBF1

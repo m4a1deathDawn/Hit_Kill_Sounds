@@ -46,6 +46,10 @@ local function clear_kill_state()
         HKS.HitKillIconManager.clear()
     end
 
+    if HKS.HitKillBF5Text and HKS.HitKillBF5Text.clear then
+        HKS.HitKillBF5Text.clear()
+    end
+
     if HKS.HitKillBF1Manager and HKS.HitKillBF1Manager.clear then
         HKS.HitKillBF1Manager.clear()
     end
@@ -85,6 +89,7 @@ HKS.HitKillSoundsKillstreakCounters = killstreak_counters
 HKS.HitKillSoundsKillstreakStates = killstreak_counters
 
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_score_feed")
+HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_bf5_text")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_custom_audio")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_events")
 HKS:io_dofile("Hit_Kill_Sounds/scripts/mods/Hit_Kill_Sounds/Hit_Kill_Sounds_bgm")
@@ -149,16 +154,34 @@ HKS:hook("UIHud", "init", function(func, self, elements, visibility_groups, para
     return func(self, elements, visibility_groups, params)
 end)
 
+local GAMEPLAY_STATES = {
+    StateGameplay = true,
+    GameplayStateRun = true,
+    StateRun = true,
+}
+
+local CLEAR_ON_ENTER_STATES = {
+    StateLoading = true,
+    StateVictoryDefeat = true,
+    StateGameScore = true,
+    StateMainMenu = true,
+    StateExitToMainMenu = true,
+    StateMissionServerExit = true,
+}
+
 HKS.on_game_state_changed = function(status, state)
-    if status == "enter" and state == "StateRun" then
+    if status == "enter" and GAMEPLAY_STATES[state] then
         stop_hit_kill_audio()
         clear_kill_state()
         HKS:start_player()
-    elseif status == "exit" and state == "StateRun" then
+    elseif status == "exit" and GAMEPLAY_STATES[state] then
         if HKS.HitKillSoundsBGM and HKS.HitKillSoundsBGM.stop then
             HKS.HitKillSoundsBGM.stop(true)
         end
         HKS:stop_player()
+        clear_kill_state()
+    elseif status == "enter" and CLEAR_ON_ENTER_STATES[state] then
+        stop_hit_kill_audio()
         clear_kill_state()
     end
 end
@@ -296,6 +319,20 @@ local score_feed_reset_settings = {
 }
 
 HKS.on_setting_changed = function(setting_id)
+    if HKS.HitKillIconManager and HKS.HitKillIconManager.invalidate_settings then
+        HKS.HitKillIconManager.invalidate_settings()
+    end
+
+    if setting_id == "bf5_text_feedback_enabled" then
+        if HKS:get("bf5_text_feedback_enabled") == false and HKS.HitKillBF5Text and HKS.HitKillBF5Text.clear then
+            HKS.HitKillBF5Text.clear()
+        end
+    elseif setting_id == "bf5_hit_score_enabled" then
+        if HKS:get("bf5_hit_score_enabled") == false and HKS.HitKillBF5Text and HKS.HitKillBF5Text.clear_hit_hold then
+            HKS.HitKillBF5Text.clear_hit_hold()
+        end
+    end
+
     -- Any setting switch cancels stale one-shot requests and active voices. BGM owns
     -- a separate SimpleAudio play_id and is refreshed by its own setting handler below.
     -- BF4 text-feed layout changes only clear their own HUD state. Output-specific
@@ -361,6 +398,7 @@ end
 
 HKS.on_disabled = function()
     stop_hit_kill_audio()
+    clear_kill_state()
     if HKS.HitKillSoundsBGM then
         HKS.HitKillSoundsBGM.stop(true)
     end
@@ -372,6 +410,10 @@ HKS.on_unload = function()
 
     if HKS.HitKillIconManager and HKS.HitKillIconManager.clear then
         HKS.HitKillIconManager.clear()
+    end
+
+    if HKS.HitKillBF5Text and HKS.HitKillBF5Text.clear then
+        HKS.HitKillBF5Text.clear()
     end
 
     if HKS.HitKillBF1Manager and HKS.HitKillBF1Manager.clear then

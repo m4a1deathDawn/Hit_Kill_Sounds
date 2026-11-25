@@ -2,14 +2,14 @@
 
 [English](README_en.md) | [简体中文](README.md)
 
-**Current version: v1.5.7**
+**Current version: v1.5.8**
 
 Adds multi-game **hit and kill sounds**, **kill icon & banner HUDs** (BFV / BF1 / CF / Valorant), a **Battlefield 4-style text kill feed and score tally**, **custom audio packs (UserAudio)**, and **custom Mourningstar hub BGM** to Warhammer 40,000: Darktide.
 
 ### Highlights
 
 - **18 Built-in Game Sound Sources + Custom Audio Pack**: Mix and match 6 independent audio slots (normal hit, weakspot hit, normal/weakspot melee hit, normal kill, headshot kill) with optional native game hit/kill sound muting.
-- **4 Distinct Kill Icon HUD Styles**: Battlefield V HD queued skulls (with a 12-tooth destroy-vehicle Boss gear), Battlefield 1 dual-box kill banner (with exact all-class weapon/blitz/ability/DoT/companion attribution and a horde-safe priority queue), CrossFire killstreak badges, and Valorant killstreak emblems with particle effects.
+- **4 Distinct Kill Icon HUD Styles**: Battlefield V HD queued skulls (with a 12-tooth destroy-vehicle Boss gear, adaptive staggered spawning, settle-triggered thinning shockwave, staggered fade wave, and centered 3-tier BFV text kill/hit score feedback), Battlefield 1 dual-box kill banner (with vertical center-outward unfold/collapse & synchronized text compression, a unified full-card 45° left-to-right light sweep, exact all-class weapon/blitz/ability/DoT/companion attribution, and a horde-safe priority queue), CrossFire killstreak badges, and Valorant killstreak emblems with particle effects.
 - **Battlefield 4-Style Text Kill Feed**: Works standalone (no killstreak toggle required), featuring a top-down cascade, two-stage terminal typewriter transform (`[Weapon / Kill Method]` + bright red victim name), and authentic no-plus-sign cumulative tally.
 - **Zero-Lua Custom Audio**: Drop in WAV or MP3 files and edit plain-text playlists to customize hit sounds, kill sounds, and Mourningstar hub BGM without touching Lua.
 
@@ -66,19 +66,23 @@ Hit sounds, kill sounds, kill icons, and the BF4 text feed can all be toggled in
 
 ## Kill Icons and HUD Feedback
 
-### Battlefield V (BFV) Kill Icons
+### Battlefield V (BFV) Kill Icons and Text Kill Feedback
 
-Recreates Battlefield V's horizontal kill-icon queue with `512×512` fringe-free Lanczos-3 HD textures (V-notch normal skull, lightning-crack headshot skull, and a dedicated 12-tooth destroy-vehicle gear icon for Boss / Monster / Captain kills).
+Recreates Battlefield V's horizontal kill-icon queue and centered 3-tier score feedback with `512×512` fringe-free Lanczos-3 HD textures (V-notch normal skull, lightning-crack headshot skull, and a dedicated 12-tooth destroy-vehicle gear icon for Boss / Monster / Captain kills).
 
-- **Kinetics and queue**: 10 main slots plus up to 2 leaving-transition slots, sub-pixel centering to eliminate 1px jitter, snappy normal entry slam, headshot two-stage micro-rebound (`+4%`) with warm-white flash, Boss gear slam rebound (`+6%`) with a `45°` decelerating spin, dual-ring morphing shockwave on both headshots and Boss kills, and centered contraction during fade-out.
-- **Customization**: Opacity, separate Normal/Headshot/Boss RGB sliders, Boss gear toggle, horizontal/vertical position, scale (`0.5–2.0x`), and display duration (`1.0–3.0s`).
+- **High-impact kinetics & adaptive queue**: 10 main slots + 8 leaving-transition slots + 4 detached shockwave slots, powered by an adaptive staggered multi-kill queue (`0ms` first-kill response, `0.095s → 0.035s` dynamic cadence during horde bursts, priority protection for `Boss > Headshot > Normal`). Features translucent high-scale entry slams (`0.15 → 1.0` scale-coupled opacity + peak micro-hold), headshot (`1.12x`) and Boss (`1.16x` + `45°` spin settle) two-stage micro-rebound, a **settle-triggered single-ring morphing shockwave** (outer-radius-locked bold/thin alpha-preserving cross-fade expanding to `4.15x`, finishing cleanly in place via the detached ripple pool on eviction or handoff), staggered fade-out waves with seamless handoff on new kills, and `54%` max-row-width dynamic spacing compression.
+- **Centered 3-tier BFV text kill feedback (on by default, independently toggleable)**: Automatically anchors below the BFV kill icons following their position, scale, opacity, duration, and target filters with screen-edge safety clamping, styled in authentic BFV crisp white with drop shadows:
+  1. **Kill main line**: Displays `Victim [Kill Method] +Score` (reusing exact all-class weapon/blitz/ability/DoT/companion attribution; Normal `+100`, Elite `+200`, Special `+250`, Boss `+500`) with horde-adaptive fast-switching.
+  2. **Rolling total score**: Large thousand-separated total with smooth rolling catch-up and graceful idle fade-out.
+  3. **Bonus lines stack (up to 3 rows)**: Includes **Headshot (`+50`)**, an independent `5.0s` **multi-kill streak bonus** (Double / Triple / Quad / Five / Multi Kill), and an optional **Enemy Hit Score** (`ENEMY HIT +N` scaled by `% max HP` dealt across both non-lethal hits and killing blows, with per-unit credit capping and overkill subtraction so each enemy sums cleanly to `+100` plus a fractional remainder accumulator so light hits on high-HP Bosses never round away; pins at row 1 while firing, drops into the fading stack after `1.5s`, and is fully decoupled from hit-sound toggles).
+- **Customization**: Opacity, separate Normal/Headshot/Boss RGB sliders, Boss gear toggle, horizontal/vertical position, icon scale (`0.5–2.0x`), display duration (`1.0–3.0s`), plus BFV text kill feedback toggle, enemy hit score toggle, and text size (`50%–150%`).
 
 ### Battlefield 1 (BF1) Kill Icons and Dual-Box Kill Banner
 
 Recreates Battlefield 1's iconic lower-center dual-box kill banner with three `256×256` luminance-normalized pure-white Lanczos-3 textures (classic skull & crossbones, cracked headshot skull, and an 8-tooth rotating Boss gear) for lossless custom RGB tinting.
 
-- **Dual-box banner & all-class kill attribution**: A darker square icon box on the left (with a side status accent bar and transient entry flash) pairs seamlessly with a dynamically sized info box on the right displaying the localized victim name, kill method, and right-hand value (defaults to BF1 classic kill score; switchable to target max health, killing blow damage, or hidden). Kill attribution routes by exact `damage_profile` across melee/ranged weapons, weapon-specific explosions (Rumbler, Bolters, Plasma, Force Staffs, Power Mauls, etc.), all classes' blitzes and combat abilities (resolved via native `ArchetypeTalents` localization), DoT types (Bleed/Burn/Soulblaze/Toxin/Electrocution/Corruption), environmental barrels, and Cyber-Mastiff/Servo-Skull companions.
-- **Animations & horde-safe priority queue**: Elastic icon-box pop-in + horizontal info-box reveal, constant-font-size text slide-in without glyph jitter, headshot two-stage slam with warm-white flash and glow, and Boss `45°` gear spin with `1.35x` extended hold. A cap-4 priority short queue (`Boss > Special > Elite > Headshot > Normal`) merges rapid low-tier horde kills into an `xN` badge while supporting urgent high-value preemption (`0.08s`) and Boss hold protection (`0.65s`).
+- **Dual-box banner & all-class kill attribution**: A darker square icon box on the left (with a side status accent bar) pairs seamlessly with a dynamically sized info box on the right displaying the localized victim name, kill method, and right-hand value (defaults to BF1 classic kill score; switchable to target max health, killing blow damage, or hidden). Kill attribution routes by exact `damage_profile` across melee/ranged weapons, weapon-specific explosions (Rumbler, Bolters, Plasma, Force Staffs, Power Mauls, etc.), all classes' blitzes and combat abilities (resolved via native `ArchetypeTalents` localization), DoT types (Bleed/Burn/Soulblaze/Toxin/Electrocution/Corruption), environmental barrels, and Cyber-Mastiff/Servo-Skull companions.
+- **Authentic BF1 kinetics & horde-safe priority queue**: Recreates Battlefield 1's signature **vertical center-outward unfold** (`0.13s` `EaseOutQuart`) and **vertical center-inward collapse** (`0.20s`, with font sizes and row spacing compressing into the centerline alongside the card without overflowing, plus smooth mid-exit reopen on chained kills). Right after opening (and on multi-kill refreshes), a **unified 45° left-to-right light sweep** glides cleanly across the entire card—emblem, divider, victim name, weapon, and score—analytically clipped to the card edges at a true 45° angle regardless of banner width and pixel-locked to 3 silhouette-masked emblem sheen atlases with adaptive contrast for pure-white/gold/custom colors (transparent `icon_only` mode automatically shows emblem-silhouette sheen only). Includes headshot two-stage slam with warm-white glow, Boss 8-tooth gear vertical unfold followed by `45°` spin settle and `1.35x` extended hold, plus a cap-4 priority short queue (`Boss > Special > Elite > Headshot > Normal`) that merges rapid low-tier horde kills into an `xN` badge while supporting urgent preemption (`0.08s`) and Boss hold protection (`0.65s`).
 - **Customization**: Full Kill Banner / Icon Box Only modes, victim color mode (Classic BF1 Red or enemy tier), Boss gear toggle, banner background opacity, Normal/Headshot/Boss RGB sliders, plus BFV-aligned opacity, horizontal/vertical position, size (`0.5–2.0x`), and display duration (`1.0–4.5s`).
 
 ### Battlefield 4 (BF4)-Style Text Kill Feed and Score Tally
@@ -143,8 +147,8 @@ Notes: `→ normal` falls back to that source's normal pool for headshots; `—`
 
 ```text
 UserAudio/
-├─ README_自定义音频.txt      Chinese plain-text guide (v1.5.7)
-├─ README_Custom_Audio.txt  English plain-text guide (v1.5.7)
+├─ README_自定义音频.txt      Chinese plain-text guide (v1.5.8)
+├─ README_Custom_Audio.txt  English plain-text guide (v1.5.8)
 ├─ BGM/
 │  └─ tracks.txt            BGM playlist (comments only by default)
 ├─ Hit/
@@ -253,7 +257,7 @@ Leaving the hub, starting a mission, disabling BGM/master switches, or unloading
 
 - **Dependencies**: Audio uses **SimpleAudio** and icons use **SimpleAssets**. The legacy HTTP player remains only as an SFX compatibility fallback; release packages with SimpleAudio + SimpleAssets do not need `bin/`. Hub BGM always uses SimpleAudio.
 - **Concurrency & queue**: HKS caps its own short-sound concurrency at 5 hit, 5 kill, and 10 total active voices (pending queue 10, max wait `0.12s`, up to 2 dispatches per frame, `0.03s` min interval) without limiting SimpleAudio globally or BGM.
-- **v1.5.7 validation**: All 4 newly baked textures (three `256×256` BF1 textures + one `512×512` BFV Boss gear), localization key coverage (0 missing), and `luacheck` across all modified/added Lua files (0 errors) pass. BF1 banners, BFV Boss gear, and all-class blitz/ability kill attribution have been verified in game with no bugs.
+- **v1.5.8 validation**: New `Hit_Kill_Sounds_bf5_text.lua` and all modified Lua files (`Hit_Kill_Sounds_hud.lua`, `Hit_Kill_Sounds_bf1_hud.lua`, `Hit_Kill_Sounds_assets_backend.lua`, `Hit_Kill_Sounds.lua`, `Hit_Kill_Sounds_data.lua`, `Hit_Kill_Sounds_localization.lua`, `Hit_Kill_Sounds_events.lua`) pass `luacheck` with 0 errors and 0 new warnings plus a full-mod LuaJIT 60-upvalue safety audit across all 17 Lua files; alpha-preserving single-ring morph math, fractional Boss hit-score accumulation, BF1 full-card 45° collinear sheen & exit text compression curves, and screen-edge clamp bounds are verified alongside in-game BFV and BF1 testing.
 
 ---
 
@@ -271,6 +275,7 @@ Built-in sounds and icons remain the property of their respective rights holders
 - **Special thanks**:
   - **BiliBili UP EBuyToDeep** ([Profile](https://space.bilibili.com/1273948298)): For the original external audio player concept and killstreak inspiration that made this mod possible.
   - **deluxghost** ([Profile](https://space.bilibili.com/4712698)): For **SimpleAudio + SimpleAssets**, allowing this mod since v1.2 to remove external executable dependencies.
+  - **BiliBili UP 博学橘耄** ([Profile](https://space.bilibili.com/321884781)): Special thanks for graciously granting permission to reference the BFV kill feedback animation and text kill feedback code from their Helldivers 2 mod [BFV Hit and Kill Feedback](https://www.nexusmods.com/helldivers2/mods/16927).
 
 ---
 
@@ -281,6 +286,21 @@ This Mod is provided for educational and personal use. Before replacing, sharing
 ---
 
 ## Changelog
+
+### v1.5.8
+
+- **Battlefield V (BFV) kill icon animation overhaul**:
+  - **High-impact translucent entry kinetics**: Upgraded normal (`2.60x`), headshot (`3.15x`, steady `1.12x`, `0.92x` rebound), and Boss (`3.45x`, steady `1.16x`, `0.89x` rebound + preserved `-45°` spin settle) entry curves with peak micro-hold and `0.15 → 1.0` scale-coupled opacity, removing redundant impact white flash.
+  - **Settle-triggered single-ring thinning shockwave + detached ripple pool**: Shockwaves now ignite at the exact landing settle frame; bold and thin ring textures share the identical real-time scale (`0.96x → 4.15x`) with exact alpha-preserving cross-fade so they read as one continuously thinning shockwave rather than two separate rings; added a 4-slot detached ripple pool so evicted/handed-off rings finish smoothly in place.
+  - **Adaptive staggered multi-kill queue & fade wave**: Added a 24-slot priority-protected adaptive stagger queue (`0ms` first-kill spawn, `0.095s → 0.035s` cadence under horde bursts, protecting `Boss > Headshot > Normal`) while keeping `SimpleAudio` dispatch zero-delay; idle exit now peels left-to-right in a staggered fade wave, an expanded 8-slot leaving pool hands off fading rows cleanly without pop-out when new kills arrive, and dynamic row spacing compresses safely within `54%` screen width.
+- **Battlefield V (BFV) centered 3-tier text kill feedback & enemy hit score**:
+  - Added `Hit_Kill_Sounds_bf5_text.lua` and integrated 5 native `text` widgets directly into `HudHitKillICON`, locked to BFV icon position, scale, opacity, and duration with horizontal/bottom edge clamping; added `bf5_text_feedback_enabled` (on by default), `bf5_hit_score_enabled` (on by default), and `bf5_text_scale` (`50%–150%`) under `icon_settings_bf5`.
+  - Recreated BFV's crisp white 3-tier layout: **Kill main line** (`Victim [Kill Method] +Score` reusing all-class attribution and horde-adaptive fast-switching), **thousand-separated rolling total score**, and a **3-row bonus stack** (Headshot `+50`, independent `5.0s` Double/Triple/Quad/Five/Multi Kill streaks, plus an optional `% max HP` enemy hit score covering both non-lethal hits and killing blows / one-shots with overkill subtraction and a fractional remainder accumulator for high-HP Bosses, decoupled from hit-sound toggles).
+- **Battlefield 1 (BF1) kill icon & banner animation authenticity upgrade**:
+  - **Vertical center-outward unfold/collapse & synchronized exit text compression**: Rebuilt entry and exit kinetics in `Hit_Kill_Sounds_bf1_hud.lua`, replacing uniform box scaling, downward exit drift, and full-box entry flash with center-anchored vertical scale unfolding (`0.13s`, `EaseOutQuart`) and vertical collapsing (`0.20s`, `open_y = 1 - t^2.4`). Banner text and combo badge font sizes and row spacing compress smoothly into the centerline alongside the closing card before fading out cleanly, mid-exit kills smoothly reopen from the current aperture height, and the 8-tooth Boss gear unfolds/collapses cleanly along the vertical axis (`0°`) before spinning `-45°`.
+  - **Unified full-card 45° left-to-right light sweep**: Added `BF1/bf1_card_sheen.png` and three 16-frame silhouette-masked sheen atlases (`kill_default_sheen_atlas.png`, `kill_headshot_sheen_atlas.png`, `kill_boss_sheen_atlas.png`). Analytically clipped `texture_uv` sweeping maintains a true 45° angle across any banner width with zero border overflow, sweeping continuously across both the emblem and text while adaptive base contrast keeps pure-white skulls gleaming; transparent `icon_only` mode automatically displays emblem-silhouette sheen only.
+- **Darktide UI optimizations & cross-match leak fix**: Eliminated per-frame Lua table allocations in `Hit_Kill_Sounds_hud.lua`, gated `_update_scenegraph` to dirty frames only, unified 3-state async texture loading (with `on_settled` callback & `is_ok` check in `Hit_Kill_Sounds_assets_backend.lua`) plus `destroy` & hub cleanup across both BFV and BF1, and consolidated BF1 constants into a `CFG` table to stay well within LuaJIT's 60-upvalue per-function limit; fixed `HKS.on_game_state_changed` to handle Darktide's real state names (`StateGameplay` / `GameplayStateRun` / `StateLoading` / `StateVictoryDefeat` / `StateGameScore`, etc.) and added `clear_kill_state()` to `HKS.on_disabled`, preventing leftover kill text from carrying over into the next mission.
+- **Cross-type weapon special attack kill attribution fix (shared by BF1 / BF4 / BF5)**: Fixed `resolve_kill_weapon_name` in `Hit_Kill_Sounds_events.lua` unconditionally overriding the weapon slot based solely on `attack_type`—kills now first match `damage_profile.name` directly against the equipped primary and secondary `weapon_template`s (weak-key cached across `actions`, `shotshell`, `hit_scan_template`, `projectile_template`, `explosion_template`, and `weapon_special_tweak_data`), with fallback preserving the active weapon slot when inconclusive. Fixes ranged weapons' melee special attacks (e.g. Double-Barreled Shotgun bash, bayonets, Ogryn Grenadier Gauntlet melee punches, Force Staff/Bolter bashes) displaying the melee weapon in kill text, while also handling melee weapons' non-melee specials (Dual Shivs throw, Blaze Force Greatsword warp slash, Shock Maul/Shield `weapon_shout`) and quick weapon-swaps after firing.
 
 ### v1.5.7
 
@@ -293,14 +313,14 @@ This Mod is provided for educational and personal use. Before replacing, sharing
 - **Accurate all-class blitz & combat ability kill attribution (shared by BF1 & BF4)**: Built a native `ArchetypeTalents` ability-name lookup in `Hit_Kill_Sounds_events.lua` and routed kill attribution by exact `damage_profile.name` across all classes' grenades/blitzes, combat abilities, weapon-specific explosions (Bolters, Rumbler, Plasma, Force Staffs, Power Mauls, etc.), and map barrels—fixing grenade and ability kills showing the currently held or equipped ranged weapon.
 - **Backend & documentation updates**: Added `load_bf1_icons` and optional BFV `kill_boss.png` loading to `Hit_Kill_Sounds_assets_backend.lua`; refreshed both README files and bumped both `UserAudio` plain-text guides to `v1.5.7`.
 
+<details>
+<summary>Expand older version history (v1.5.6 – v0.9)</summary>
+
 ### v1.5.6
 
 - **BFV HD kill icon upgrade**: Replaced BFV icons with Lanczos-3 resampled `512×512` fringe-free HD textures (`kill_normal.png`, `kill_headshot.png`, `kill_circle_bold.png`, `kill_circle_thin.png`, plus a `kill_circle.png` compatibility copy) with unified silhouettes and `16px` safety padding.
 - **Dual-ring morphing headshot shockwave**: Upgraded `circle_icon` to a concentric dual-pass widget handing off from an inner bold ring (`0.00–0.24s`) to an outer thin ring (`0.00–0.40s`) to recreate BFV's stroke-thinning shockwave.
 - **Impact kinetics & sub-pixel centering**: Tuned normal (`0.16s`) and headshot (`+4%`, `0.18s` micro-rebound + warm-white flash) animations, switched to floating-point sub-pixel centering to eliminate 1px jitter, and fixed fade-out queue contraction.
-
-<details>
-<summary>Expand older version history (v1.5.5 – v0.9)</summary>
 
 ### v1.5.5
 
