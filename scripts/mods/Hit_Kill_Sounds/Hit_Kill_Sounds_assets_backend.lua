@@ -26,6 +26,10 @@ local BF1_TEXTURE_KEYS = {
     default = "kill_default.png",
     headshot = "kill_headshot.png",
     boss = "kill_boss.png",
+    default_sheen = "kill_default_sheen_atlas.png",
+    headshot_sheen = "kill_headshot_sheen_atlas.png",
+    boss_sheen = "kill_boss_sheen_atlas.png",
+    card_sheen = "bf1_card_sheen.png",
 }
 
 local BF5_PRIMARY_PATHS = {
@@ -182,22 +186,22 @@ local function apply_bf5_results(path_map, results, textures)
     local circle_thin = path_map.circle_thin and results[path_map.circle_thin]
     local circle = path_map.circle and results[path_map.circle]
 
-    if normal and normal.texture then
+    if normal and normal.is_ok ~= false and normal.texture then
         textures.normal = normal.texture
     end
-    if headshot and headshot.texture then
+    if headshot and headshot.is_ok ~= false and headshot.texture then
         textures.headshot = headshot.texture
     end
-    if boss and boss.texture then
+    if boss and boss.is_ok ~= false and boss.texture then
         textures.boss = boss.texture
     end
-    if circle_bold and circle_bold.texture then
+    if circle_bold and circle_bold.is_ok ~= false and circle_bold.texture then
         textures.circle_bold = circle_bold.texture
     end
-    if circle_thin and circle_thin.texture then
+    if circle_thin and circle_thin.is_ok ~= false and circle_thin.texture then
         textures.circle_thin = circle_thin.texture
     end
-    if circle and circle.texture then
+    if circle and circle.is_ok ~= false and circle.texture then
         textures.circle = circle.texture
     end
 
@@ -208,29 +212,32 @@ local function apply_bf5_results(path_map, results, textures)
     return textures.normal ~= nil and textures.headshot ~= nil and textures.circle ~= nil
 end
 
-local function load_bf5_with_paths(path_map, textures, fallback, try_existing_paths)
+local function load_bf5_with_paths(path_map, textures, fallback, try_existing_paths, on_settled)
     load_textures(bf5_path_list(path_map), function(results)
         if apply_bf5_results(path_map, results, textures) then
             log_bf5_simple()
+            if on_settled then on_settled(true) end
             return
         end
 
         if try_existing_paths then
-            load_bf5_with_paths(BF5_EXISTING_PATHS, textures, fallback, false)
-        elseif fallback then
-            fallback()
+            load_bf5_with_paths(BF5_EXISTING_PATHS, textures, fallback, false, on_settled)
+        else
+            if on_settled then on_settled(false) end
+            if fallback then fallback() end
         end
     end, function()
         if try_existing_paths then
-            load_bf5_with_paths(BF5_EXISTING_PATHS, textures, fallback, false)
-        elseif fallback then
-            fallback()
+            load_bf5_with_paths(BF5_EXISTING_PATHS, textures, fallback, false, on_settled)
+        else
+            if on_settled then on_settled(false) end
+            if fallback then fallback() end
         end
     end)
 end
 
 AssetsBackend.BF1_TEXTURE_KEYS = BF1_TEXTURE_KEYS
-AssetsBackend.load_bf1_icons = function(textures, fallback)
+AssetsBackend.load_bf1_icons = function(textures, fallback, on_settled)
     local base_path = "mods/Hit_Kill_Sounds/cartoon_preview/kill_icon/BF1/"
     local paths = {}
     local path_by_key = {}
@@ -243,6 +250,7 @@ AssetsBackend.load_bf1_icons = function(textures, fallback)
 
     local function fallback_with_log()
         log_bf1_legacy()
+        if on_settled then on_settled(false) end
         if fallback then fallback() end
     end
 
@@ -250,7 +258,7 @@ AssetsBackend.load_bf1_icons = function(textures, fallback)
         local loaded = 0
         for key, path in pairs(path_by_key) do
             local data = results and (results[path] or results[BF1_TEXTURE_KEYS[key]])
-            if data and data.texture then
+            if data and data.is_ok ~= false and data.texture then
                 textures[key] = data.texture
                 loaded = loaded + 1
             end
@@ -266,24 +274,26 @@ AssetsBackend.load_bf1_icons = function(textures, fallback)
     load_textures(paths, function(results)
         if apply(results) then
             log_bf1_simple()
+            if on_settled then on_settled(true) end
         else
             fallback_with_log()
         end
     end, fallback_with_log)
 end
 
-AssetsBackend.load_bf5_icons = function(textures, fallback)
+AssetsBackend.load_bf5_icons = function(textures, fallback, on_settled)
     local function fallback_with_log()
         log_bf5_legacy()
         if fallback then fallback() end
     end
 
     if not get_simple_assets() then
+        if on_settled then on_settled(false) end
         fallback_with_log()
         return
     end
 
-    load_bf5_with_paths(BF5_PRIMARY_PATHS, textures, fallback_with_log, true)
+    load_bf5_with_paths(BF5_PRIMARY_PATHS, textures, fallback_with_log, true, on_settled)
 end
 
 local CF_ICON_SCAN_MAX = 30

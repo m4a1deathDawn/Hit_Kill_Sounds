@@ -1586,6 +1586,150 @@ local function resolve_bf1_dot_weapon_name(damage_profile)
     return HKS:localize("bf1_weapon_dot_generic")
 end
 
+local WEAPON_TEMPLATE_PROFILE_ROOT_KEYS = {
+    "actions",
+    "weapon_special_tweak_data",
+    "overheat_configuration",
+    "alternate_fire_settings",
+    "chain_settings",
+    "projectile_template",
+    "damage_template",
+}
+
+local DAMAGE_PROFILE_FIELD_KEYS = {
+    damage_profile = true,
+    damage_profile_special_active = true,
+    damage_profile_on_abort = true,
+    damage_profile_special_active_on_abort = true,
+    inner_damage_profile = true,
+    outer_damage_profile = true,
+    last_damage_profile = true,
+    dodge_damage_profile = true,
+    close_damage_profile = true,
+    death_damage_profile = true,
+    vent_damage_profile = true,
+    proficiency_vent_damage_profile = true,
+}
+
+local damage_profile_templates_cache = false
+local weapon_template_util_cache = false
+local weapon_template_profile_cache = setmetatable({}, { __mode = "k" })
+
+local function get_damage_profile_templates()
+    if damage_profile_templates_cache == false then
+        local ok, templates = pcall(require, "scripts/settings/damage/damage_profile_templates")
+        damage_profile_templates_cache = (ok and type(templates) == "table") and templates or nil
+    end
+    return damage_profile_templates_cache
+end
+
+local function get_weapon_template_util()
+    if weapon_template_util_cache == false then
+        local ok, util = pcall(require, "scripts/utilities/weapon/weapon_template")
+        weapon_template_util_cache = (ok and type(util) == "table") and util or nil
+    end
+    return weapon_template_util_cache
+end
+
+local function collect_weapon_template_profiles(node, damage_profile_templates, profiles, visited, depth, key_name)
+    if type(node) ~= "table" or visited[node] or depth > 12 then
+        return
+    end
+    visited[node] = true
+
+    local node_name = rawget(node, "name")
+    if type(node_name) == "string" then
+        if damage_profile_templates and rawget(damage_profile_templates, node_name) == node then
+            profiles[node_name] = true
+            return
+        elseif key_name and DAMAGE_PROFILE_FIELD_KEYS[key_name] then
+            profiles[node_name] = true
+            return
+        end
+    end
+
+    for k, v in pairs(node) do
+        if type(v) == "table" then
+            collect_weapon_template_profiles(v, damage_profile_templates, profiles, visited, depth + 1, k)
+        end
+    end
+end
+
+local function get_weapon_template_profiles(weapon_template)
+    if type(weapon_template) ~= "table" then
+        return nil
+    end
+
+    local cached = weapon_template_profile_cache[weapon_template]
+    if cached ~= nil then
+        return cached
+    end
+
+    local profiles = {}
+    local visited = { [weapon_template] = true }
+    local damage_profile_templates = get_damage_profile_templates()
+
+    for i = 1, #WEAPON_TEMPLATE_PROFILE_ROOT_KEYS do
+        local root_key = WEAPON_TEMPLATE_PROFILE_ROOT_KEYS[i]
+        local subtree = rawget(weapon_template, root_key)
+        if type(subtree) == "table" then
+            collect_weapon_template_profiles(subtree, damage_profile_templates, profiles, visited, 1, root_key)
+        end
+    end
+
+    weapon_template_profile_cache[weapon_template] = profiles
+    return profiles
+end
+
+local function get_slot_weapon_template(visual_loadout_ext, slot_name)
+    if not visual_loadout_ext or not slot_name or slot_name == "none" then
+        return nil
+    end
+
+    if visual_loadout_ext.weapon_template_from_slot then
+        local ok_wt, weapon_template = pcall(visual_loadout_ext.weapon_template_from_slot, visual_loadout_ext, slot_name)
+        if ok_wt and type(weapon_template) == "table" then
+            return weapon_template
+        end
+    end
+
+    if visual_loadout_ext.item_from_slot then
+        local ok_item, item = pcall(visual_loadout_ext.item_from_slot, visual_loadout_ext, slot_name)
+        if ok_item and type(item) == "table" then
+            local weapon_template_util = get_weapon_template_util()
+            if weapon_template_util and weapon_template_util.weapon_template_from_item then
+                local ok_wt, weapon_template = pcall(weapon_template_util.weapon_template_from_item, item)
+                if ok_wt and type(weapon_template) == "table" then
+                    return weapon_template
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function resolve_slot_from_weapon_templates(visual_loadout_ext, profile_name)
+    if not visual_loadout_ext or type(profile_name) ~= "string" or profile_name == "" then
+        return nil
+    end
+
+    local primary_template = get_slot_weapon_template(visual_loadout_ext, "slot_primary")
+    local secondary_template = get_slot_weapon_template(visual_loadout_ext, "slot_secondary")
+    local primary_profiles = primary_template and get_weapon_template_profiles(primary_template)
+    local secondary_profiles = secondary_template and get_weapon_template_profiles(secondary_template)
+    local matches_primary = primary_profiles ~= nil and primary_profiles[profile_name] == true
+    local matches_secondary = secondary_profiles ~= nil and secondary_profiles[profile_name] == true
+
+    if matches_primary and not matches_secondary then
+        return "slot_primary"
+    elseif matches_secondary and not matches_primary then
+        return "slot_secondary"
+    end
+
+    return nil
+end
+
 local function resolve_slot_weapon_name(visual_loadout_ext, slot_name)
     if not visual_loadout_ext or not slot_name or slot_name == "none" then
         return nil
@@ -1725,7 +1869,19 @@ local function resolve_kill_weapon_name(
         return HKS:localize("bf1_weapon_explosion")
     end
 
-    -- 7. Remaining shout kills map to combat ability; remaining unknown explosions map to blitz or explosion.
+    -- 7. Match damage_profile directly against equipped primary/secondary weapon templates.
+    --    This accurately resolves cross-type weapon attacks (e.g. ranged weapon special melee
+    --    bash/bayonet, Ogryn gauntlet melee, melee weapon thrown knives or weapon_shout) as
+    --    well as weapon-swapped projectile kills without relying solely on attack_type.
+    local matched_weapon_slot = resolve_slot_from_weapon_templates(visual_loadout_ext, profile_name)
+    if matched_weapon_slot then
+        local matched_weapon_name = resolve_slot_weapon_name(visual_loadout_ext, matched_weapon_slot)
+        if matched_weapon_name then
+            return matched_weapon_name
+        end
+    end
+
+    -- 8. Remaining shout kills map to combat ability; remaining unknown explosions map to blitz or explosion.
     if attack_type == AttackSettings.attack_types.shout then
         local shout_label = resolve_ability_label(attacking_unit, "combat_ability", nil)
         if shout_label then
@@ -1748,7 +1904,7 @@ local function resolve_kill_weapon_name(
         return HKS:localize("bf1_weapon_explosion")
     end
 
-    -- 8. If currently wielding an ability slot and not a standard melee/ranged attack, resolve ability name.
+    -- 9. If currently wielding an ability slot and not a standard melee/ranged attack, resolve ability name.
     if wielded_slot == "slot_grenade_ability" and
         attack_type ~= AttackSettings.attack_types.melee and
         attack_type ~= AttackSettings.attack_types.ranged then
@@ -1765,12 +1921,16 @@ local function resolve_kill_weapon_name(
         end
     end
 
-    -- 9. Regular melee / ranged weapons.
+    -- 10. Fallback for regular melee / ranged weapons when template matching is inconclusive.
+    --     Preserve the currently wielded weapon slot (slot_primary / slot_secondary) so ranged
+    --     weapon melee specials or shared push profiles are not misattributed to the other slot.
     local preferred_slot = wielded_slot
-    if attack_type == AttackSettings.attack_types.melee and preferred_slot ~= "slot_primary" then
-        preferred_slot = "slot_primary"
-    elseif attack_type == AttackSettings.attack_types.ranged and preferred_slot ~= "slot_secondary" then
-        preferred_slot = "slot_secondary"
+    if preferred_slot ~= "slot_primary" and preferred_slot ~= "slot_secondary" then
+        if attack_type == AttackSettings.attack_types.melee then
+            preferred_slot = "slot_primary"
+        elseif attack_type == AttackSettings.attack_types.ranged then
+            preferred_slot = "slot_secondary"
+        end
     end
 
     local weapon_name = resolve_slot_weapon_name(visual_loadout_ext, preferred_slot)
@@ -1840,6 +2000,44 @@ local function resolve_bf1_kill_context(
         damage = tonumber(damage) or 0,
         priority = priority,
     }
+end
+
+local function submit_bf5_hit_score(attacked_unit, numeric_damage, now, is_kill)
+    if HKS:get("bf5_text_feedback_enabled") == false or HKS:get("bf5_hit_score_enabled") == false then
+        return
+    end
+    if not HKS.HitKillBF5Text or not HKS.HitKillBF5Text.add_hit_damage then
+        return
+    end
+    local health_ext = attacked_unit and ScriptUnit.has_extension(attacked_unit, "health_system")
+    if not health_ext or not health_ext.max_health then
+        return
+    end
+    if not is_kill and health_ext.is_alive then
+        local ok_alive, alive_val = pcall(health_ext.is_alive, health_ext)
+        if ok_alive and alive_val == false then
+            return
+        end
+    end
+    local ok_hp, max_hp = pcall(health_ext.max_health, health_ext)
+    if not ok_hp or type(max_hp) ~= "number" or max_hp <= 0 then
+        return
+    end
+
+    local effective_damage = numeric_damage
+    if is_kill and health_ext.damage_taken then
+        local ok_dt, dmg_taken = pcall(health_ext.damage_taken, health_ext)
+        if ok_dt and type(dmg_taken) == "number" then
+            if dmg_taken > max_hp then
+                local prior_damage = math.max(0, dmg_taken - numeric_damage)
+                effective_damage = math.max(0, math.min(numeric_damage, max_hp - prior_damage))
+            elseif dmg_taken < max_hp then
+                effective_damage = math.max(0, math.min(numeric_damage, max_hp - dmg_taken))
+            end
+        end
+    end
+
+    HKS.HitKillBF5Text.add_hit_damage(effective_damage, max_hp, now, attacked_unit, is_kill)
 end
 
 -- 处理攻击结果的内部函数
@@ -2042,7 +2240,36 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         if HKS:get("kill_icon_style") == "BF5" and not cf_icon_active and not valorant_icon_active and
             kill_icon_target_valid and dot_icon_allowed and companion_kill_icon_allowed and
             HKS:get("kill_icon_enabled") and HKS.HitKillIconManager then
-            HKS.HitKillIconManager.show_icon(is_kill_headshot, is_bfv_boss)
+            local bf5_kill_ctx = nil
+            if HKS:get("bf5_text_feedback_enabled") ~= false then
+                submit_bf5_hit_score(attacked_unit, numeric_damage, now, true)
+                local tags = breed_or_nil and breed_or_nil.tags or {}
+                local is_special = breed_or_nil and (breed_or_nil.special == true or tags.special == true) or false
+                local is_elite = breed_or_nil and (breed_or_nil.elite == true or tags.elite == true) or false
+                local base_score = 100
+                local priority = is_kill_headshot and 2 or 1
+                if is_bfv_boss then
+                    base_score = 500
+                    priority = 5
+                elseif is_special then
+                    base_score = 250
+                    priority = 4
+                elseif is_elite then
+                    base_score = 200
+                    priority = 3
+                end
+                bf5_kill_ctx = {
+                    is_headshot = is_kill_headshot == true,
+                    is_boss = is_bfv_boss,
+                    victim_name = resolve_victim_name(breed_or_nil),
+                    weapon_name = resolve_kill_weapon_name(
+                        damage_profile, attacking_unit, attack_type, is_dot_damage, is_companion_attack
+                    ),
+                    base_score = base_score,
+                    priority = priority,
+                }
+            end
+            HKS.HitKillIconManager.show_icon(is_kill_headshot, is_bfv_boss, bf5_kill_ctx)
         end
 
         -- BF1 图标：仅当 CF / Valorant 图标未激活时（叠加 kill_icon_target_valid）
@@ -2064,6 +2291,17 @@ local function handle_attack_result(damage_profile, attacked_unit, attacking_uni
         end
 
         return
+    end
+
+    -- BF5 击中加分：独立于 hit_sound_enabled，避免关闭命中音效时误停 BF5 击中加分。
+    if VALID_HIT_RESULTS[attack_result] and not is_kill_feedback_target_excluded(breed_or_nil) and
+        HKS:get("kill_icon_style") == "BF5" and HKS:get("kill_icon_enabled") then
+        local hit_icon_target_valid = is_target_valid(breed_or_nil, HKS:get("kill_icon_target") or "all")
+        local hit_dot_allowed = not (is_dot_damage and not HKS:get("kill_dot_icon"))
+        local hit_companion_allowed = not (is_companion_attack and not HKS:get("companion_kill_icon_enabled"))
+        if hit_icon_target_valid and hit_dot_allowed and hit_companion_allowed then
+            submit_bf5_hit_score(attacked_unit, numeric_damage, Managers.time:time("main"), false)
+        end
     end
 
     -- 命中音效子开关关闭时静默

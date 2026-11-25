@@ -535,6 +535,23 @@ return {
                                     {text = "3.0s", value = "30"},
                                 },
                             },
+                            {
+                                setting_id = "bf5_text_feedback_enabled",
+                                type = "checkbox",
+                                default_value = true,
+                            },
+                            {
+                                setting_id = "bf5_hit_score_enabled",
+                                type = "checkbox",
+                                default_value = true,
+                            },
+                            {
+                                setting_id = "bf5_text_scale",
+                                type = "numeric",
+                                default_value = 100,
+                                range = {50, 150},
+                                step = 5,
+                            },
                         },
                     },
                     -- BF1 风格子分组（对称 3 图标 + 双格战报横幅 + 对齐 BF5 基础调节项）
